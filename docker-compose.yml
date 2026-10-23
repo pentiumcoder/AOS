@@ -1,0 +1,42 @@
+name: aos
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: aos
+      POSTGRES_PASSWORD: aos
+      POSTGRES_DB: aos
+    ports:
+      - "${AOS_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aos -d aos"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${AOS_REDIS_PORT:-6380}:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  chromadb:
+    image: chromadb/chroma:latest
+    ports:
+      - "${AOS_CHROMA_PORT:-8001}:8000"
+    volumes:
+      - chromadata:/data
+
+volumes:
+  pgdata:
+  redisdata:
+  chromadata:
