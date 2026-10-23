@@ -1,0 +1,9 @@
+# MCP servers started over stdio. Each tool they expose is registered as
+# mcp__<server>__<tool> and can be used by the listed agents.
+servers:
+  demo:
+    command: python
+    args: [mcp_servers/demo_server.py]
+    agents: [research, data_analysis]
+    rate_limit_per_min: 30
+    timeout_s: 30

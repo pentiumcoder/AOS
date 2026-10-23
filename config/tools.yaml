@@ -1,0 +1,25 @@
+# Which agents may call each built-in tool, with per-tool limits.
+# A built-in tool missing from this list is disabled.
+# Sensitive tools are offered only when the user's request contains one of their
+# requested_by words; a sensitive tool without that list is never offered.
+tools:
+  web_search:  {agents: [research], rate_limit_per_min: 30}
+  http_get:    {agents: [research, data_analysis], rate_limit_per_min: 30}
+  file_read:   {agents: [research, data_analysis, writing, code]}
+  file_write:  {agents: [research, data_analysis, writing, code]}
+  file_delete: {agents: [code], requested_by: [delete, remove]}
+  code_exec:   {agents: [data_analysis, code], rate_limit_per_min: 20}
+  db_query:    {agents: [data_analysis], rate_limit_per_min: 60}
+  send_email:  {agents: [writing], rate_limit_per_min: 10, requested_by: [email, e-mail, mail]}
+
+# Recipients send_email may use. Addresses written out in the request are allowed too.
+email_directory:
+  team: team@example.com
+
+http_allowlist:
+  - en.wikipedia.org
+  - api.github.com
+  - raw.githubusercontent.com
+  - pypi.org
+  - arxiv.org
+  - export.arxiv.org
