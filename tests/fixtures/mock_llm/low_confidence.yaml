@@ -1,0 +1,15 @@
+# The planner is unsure the request can be met.
+match: ["[test:low-confidence]"]
+
+plan:
+  - task_type: ambiguous_request
+    rationale: The request is vague, so this plan only gathers background.
+    confidence: 0.4
+    subtasks:
+      - {id: s1, description: Gather background on the request, specialist: research,
+         expected_output: Bullet list with sources}
+
+subtasks:
+  s1:
+    - steps:
+        - final: {output: "- Background notes. Source: https://example.org/notes", confidence: 0.6}

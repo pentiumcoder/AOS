@@ -1,0 +1,10 @@
+# Every plan has a cycle, so planning fails.
+match: ["[test:unplannable]"]
+
+plan:
+  - task_type: broken
+    rationale: Circular dependencies.
+    confidence: 0.7
+    subtasks:
+      - {id: s1, description: First, specialist: research, depends_on: [s2], expected_output: notes}
+      - {id: s2, description: Second, specialist: writing, depends_on: [s1], expected_output: text}

@@ -1,0 +1,27 @@
+# Offline web search results, matched by keyword in order. Unmatched queries get generic hits.
+- match: [pricing, managed, cloud offering]
+  results:
+    - title: Zilliz Cloud - managed Milvus
+      url: https://zilliz.com/cloud
+      snippet: Fully managed Milvus with serverless and dedicated clusters; pricing scales with compute units and storage.
+    - title: Qdrant Cloud
+      url: https://qdrant.tech/cloud/
+      snippet: Managed Qdrant clusters on AWS, GCP and Azure with a free tier; paid plans are billed by node size.
+    - title: Weaviate Cloud
+      url: https://weaviate.io/pricing
+      snippet: Serverless and dedicated Weaviate deployments; serverless pricing is based on stored vector dimensions.
+
+- match: [vector database, vector db, vector store]
+  results:
+    - title: Milvus - open-source vector database
+      url: https://milvus.io
+      snippet: Distributed vector database for billion-scale similarity search, Apache-2.0 licensed, with GPU indexes.
+    - title: Qdrant - vector search engine
+      url: https://qdrant.tech
+      snippet: Rust-based vector database with payload filtering and quantization, Apache-2.0 licensed.
+    - title: Weaviate - AI-native vector database
+      url: https://weaviate.io
+      snippet: Open-source vector database with hybrid search and built-in vectorizer modules, BSD-3-Clause licensed.
+    - title: Chroma - embedding database
+      url: https://www.trychroma.com
+      snippet: Lightweight open-source embedding store popular for prototyping retrieval-augmented generation.

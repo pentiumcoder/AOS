@@ -1,0 +1,160 @@
+# Showcase scenario: parallel research and analysis, a reviewer rejection of a draft that
+# misquotes a figure, and an email that needs approval.
+match: [vector database, vector db]
+
+plan:
+  - task_type: research_report
+    rationale: >-
+      Identify the leading databases from public sources while the benchmark analysis runs in
+      parallel, look up managed offerings once the shortlist is known, then write a summary
+      that uses only the computed figures and send it to the team.
+    confidence: 0.82
+    subtasks:
+      - id: s1
+        description: Identify the three most widely adopted open-source vector databases and summarise their architecture and licence.
+        specialist: research
+        expected_output: Bullet list of three databases, each with licence, one-line architecture summary and a source URL
+        complexity: medium
+      - id: s2
+        description: Rank the databases in the internal benchmarks table by throughput and compute cost per million queries for the top three.
+        specialist: data_analysis
+        expected_output: Markdown table of the top three by QPS with p95 latency, recall@10, monthly cost and cost per 1M queries, plus the leader on each metric
+        complexity: medium
+      - id: s3
+        description: Find the managed cloud offering and pricing model for each database identified in s1.
+        specialist: research
+        depends_on: [s1]
+        inputs: {databases: "subtask:s1"}
+        expected_output: One bullet per database naming the managed service and how it is priced, with source URLs
+        complexity: low
+      - id: s4
+        description: Write an executive summary of at most 200 words comparing the three databases and recommending one, then email it to team@example.com.
+        specialist: writing
+        depends_on: [s1, s2, s3]
+        inputs: {shortlist: "subtask:s1", benchmarks: "subtask:s2", offerings: "subtask:s3"}
+        expected_output: Bullet-point executive summary under 200 words that uses the s2 figures exactly and cites sources
+        complexity: medium
+        actions: [send_email]
+
+subtasks:
+  s1:
+    - steps:
+        - tool: web_search
+          args: {query: most widely adopted open-source vector database, max_results: 4}
+        - final:
+            output: |-
+              - **Milvus**: distributed vector database built for billion-scale similarity search, with GPU index support. Licence: Apache-2.0. Source: https://milvus.io
+              - **Qdrant**: Rust-based vector database with payload filtering and quantization. Licence: Apache-2.0. Source: https://qdrant.tech
+              - **Weaviate**: vector database with hybrid keyword and vector search and pluggable vectorizer modules. Licence: BSD-3-Clause. Source: https://weaviate.io
+            data: {databases: [Milvus, Qdrant, Weaviate]}
+            confidence: 0.85
+
+  s2:
+    - steps:
+        - tool: db_query
+          args:
+            sql: SELECT database, dataset, vectors_millions, qps, p95_latency_ms, recall_at_10, monthly_cost_usd FROM benchmarks ORDER BY qps DESC
+        - tool: code_exec
+          args:
+            code: |
+              import json
+
+              data = json.loads(r'''{{tool_output}}''')
+              rows = [dict(zip(data["columns"], row)) for row in data["rows"]]
+              for row in rows:
+                  # queries served in a 30-day month at sustained load, in millions
+                  monthly_millions = row["qps"] * 86400 * 30 / 1_000_000
+                  row["cost_per_m"] = row["monthly_cost_usd"] / monthly_millions
+              top = sorted(rows, key=lambda r: r["qps"], reverse=True)[:3]
+              print("| Database | QPS | p95 latency (ms) | Recall@10 | Monthly cost (USD) | Cost per 1M queries (USD) |")
+              print("|---|---|---|---|---|---|")
+              for r in top:
+                  print(f"| {r['database']} | {r['qps']:,} | {r['p95_latency_ms']} | {r['recall_at_10']:.3f} "
+                        f"| {r['monthly_cost_usd']:,.0f} | {r['cost_per_m']:.3f} |")
+              fastest = min(top, key=lambda r: r["p95_latency_ms"])
+              cheapest = min(top, key=lambda r: r["cost_per_m"])
+              print()
+              print(f"Highest throughput: {top[0]['database']} ({top[0]['qps']:,} QPS)")
+              print(f"Lowest p95 latency: {fastest['database']} ({fastest['p95_latency_ms']} ms)")
+              print(f"Lowest cost per 1M queries: {cheapest['database']} (${cheapest['cost_per_m']:.3f})")
+        - final:
+            output: "Benchmark results (synthetic 768-dimension dataset, 10M vectors):\n\n{{tool_result.stdout}}"
+            data: {source_table: benchmarks}
+            confidence: 0.9
+
+  s3:
+    - steps:
+        - tool: mcp__demo__company_lookup
+          args: {names: [Milvus, Qdrant, Weaviate]}
+        - tool: web_search
+          args: {query: managed cloud pricing Milvus Qdrant Weaviate, max_results: 3}
+        - final:
+            output: |-
+              - **Milvus** is offered as Zilliz Cloud, with serverless and dedicated clusters billed by compute units and storage. Source: https://zilliz.com/cloud
+              - **Qdrant** is offered as Qdrant Cloud on AWS, GCP and Azure, with a free tier and paid plans billed by node size. Source: https://qdrant.tech/cloud/
+              - **Weaviate** is offered as Weaviate Cloud, with serverless pricing based on stored vector dimensions and dedicated options. Source: https://weaviate.io/pricing
+            confidence: 0.8
+
+  s4:
+    - steps:
+        - say: The summary is ready, so I am queueing the email to the team.
+          tool: send_email
+          args:
+            to: [team@example.com]
+            subject: "Vector database comparison: executive summary"
+            body: "{{final_output}}"
+        - final:
+            output: |-
+              **Open-source vector databases: executive summary**
+
+              - **Shortlist:** Milvus, Qdrant and Weaviate are the most widely adopted open-source vector databases, and each offers a managed cloud service [1][2][3].
+              - **Throughput:** on our benchmark (10M 768-d vectors), Qdrant leads at 4,600 QPS, ahead of Milvus at 4,200 and Weaviate at 2,900.
+              - **Latency:** Qdrant has the lowest p95 latency at 14.9 ms, against 18.4 ms for Milvus and 21.7 ms for Weaviate.
+              - **Cost:** Qdrant is cheapest at $0.125 per million queries; Milvus costs $0.133 and Weaviate $0.176.
+              - **Recommendation:** Qdrant on every metric.
+
+              Sources: [1] milvus.io, [2] qdrant.tech, [3] weaviate.io; figures from the internal benchmarks table.
+            confidence: 0.8
+    - steps:
+        - say: Revised the figures; queueing the email again with the corrected summary.
+          tool: send_email
+          args:
+            to: [team@example.com]
+            subject: "Vector database comparison: executive summary"
+            body: "{{final_output}}"
+        - final:
+            output: |-
+              **Open-source vector databases: executive summary**
+
+              - **Shortlist:** Milvus, Qdrant and Weaviate are the most widely adopted open-source vector databases, and each offers a managed cloud service (Zilliz Cloud, Qdrant Cloud, Weaviate Cloud) [1][2][3].
+              - **Throughput:** on our benchmark (10M 768-d vectors), Milvus leads at 4,200 QPS, ahead of Qdrant at 3,650 and Weaviate at 2,900.
+              - **Latency:** Qdrant has the lowest p95 latency at 14.9 ms, against 18.4 ms for Milvus and 21.7 ms for Weaviate.
+              - **Cost:** Qdrant is cheapest at $0.125 per million queries; Milvus costs $0.133 and Weaviate $0.176.
+              - **Recommendation:** Qdrant for latency-sensitive, cost-conscious workloads; Milvus where peak throughput matters most.
+
+              Sources: [1] milvus.io, [2] qdrant.tech, [3] weaviate.io; figures from the internal benchmarks table.
+            confidence: 0.88
+
+review:
+  s4:
+    - approved: false
+      score: 0.45
+      issues:
+        - Qdrant throughput is given as 4,600 QPS, but the s2 benchmark table reports 3,650 QPS.
+        - The summary names Qdrant as the throughput leader; s2 shows Milvus leads at 4,200 QPS.
+        - The recommendation follows from the wrong throughput figure.
+      feedback: >-
+        Use the s2 figures exactly (Milvus 4,200 QPS, Qdrant 3,650 QPS, Weaviate 2,900 QPS),
+        correct the throughput ranking, and base the recommendation on the corrected trade-off.
+    - approved: true
+      score: 0.91
+      issues: []
+      feedback: Figures match the benchmark analysis and the recommendation follows from them.
+  default:
+    - approved: true
+      score: 0.88
+      issues: []
+      feedback: Meets the expected output.
+
+synthesize:
+  - "{{outputs.s4}}\n\n### Benchmark detail\n\n{{outputs.s2}}"
