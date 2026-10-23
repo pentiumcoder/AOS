@@ -1,0 +1,22 @@
+# The reviewer rejects every draft with a low score.
+match: ["[test:low-score]"]
+
+plan:
+  - task_type: writing
+    rationale: One writing task.
+    confidence: 0.8
+    subtasks:
+      - {id: s1, description: Draft a product announcement, specialist: writing,
+         expected_output: Three short paragraphs}
+
+subtasks:
+  s1:
+    - steps:
+        - final: {output: "Announcement draft.", confidence: 0.5}
+
+review:
+  s1:
+    - approved: false
+      score: 0.3
+      issues: [The draft is one sentence instead of three paragraphs.]
+      feedback: Write three paragraphs covering the feature, who it is for, and availability.

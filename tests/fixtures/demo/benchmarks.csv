@@ -1,0 +1,6 @@
+database,dataset,vectors_millions,recall_at_10,p95_latency_ms,qps,index_build_minutes,monthly_cost_usd,license,source
+Milvus,synthetic-768d,10,0.962,18.4,4200,38,1450,Apache-2.0,synthetic demo benchmark
+Qdrant,synthetic-768d,10,0.958,14.9,3650,31,1180,Apache-2.0,synthetic demo benchmark
+Weaviate,synthetic-768d,10,0.951,21.7,2900,44,1320,BSD-3-Clause,synthetic demo benchmark
+Chroma,synthetic-768d,10,0.937,29.3,1750,26,890,Apache-2.0,synthetic demo benchmark
+pgvector,synthetic-768d,10,0.944,34.8,1400,52,760,PostgreSQL,synthetic demo benchmark

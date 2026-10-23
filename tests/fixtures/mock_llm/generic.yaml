@@ -1,0 +1,51 @@
+# Fallback scenario for any request that no other script matches.
+match: []
+
+plan:
+  - task_type: research_summary
+    rationale: Gather sources on the request, then write a short answer grounded in them.
+    confidence: 0.8
+    subtasks:
+      - id: s1
+        description: "Search the web for sources that answer: {{request}}"
+        specialist: research
+        expected_output: Bullet list of findings, each with its source URL
+        complexity: low
+      - id: s2
+        description: Write a concise answer to the request using the findings from s1
+        specialist: writing
+        depends_on: [s1]
+        inputs: {findings: "subtask:s1"}
+        expected_output: Two to four short paragraphs that cite sources inline
+        complexity: medium
+
+subtasks:
+  default_research:
+    - steps:
+        - tool: web_search
+          args: {query: "{{request}}", max_results: 3}
+        - final:
+            output: "Findings for the request:\n{{tool_output}}"
+            confidence: 0.75
+  default_data_analysis:
+    - steps:
+        - tool: db_query
+          args: {sql: "SELECT * FROM benchmarks ORDER BY qps DESC"}
+        - final:
+            output: "Benchmark rows:\n{{tool_output}}"
+            confidence: 0.7
+  default_writing:
+    - steps:
+        - final:
+            output: "Summary based on the research:\n\n{{dep_outputs.s1}}"
+            confidence: 0.7
+  default_code:
+    - steps:
+        - tool: code_exec
+          args: {code: "print('ok')"}
+        - final:
+            output: "{{tool_output}}"
+            confidence: 0.7
+
+synthesize:
+  - "{{outputs.s2}}"

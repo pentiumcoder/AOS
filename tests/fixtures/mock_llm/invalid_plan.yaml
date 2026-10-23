@@ -1,0 +1,19 @@
+# First plan has a dependency cycle; the re-plan fixes it.
+match: ["[test:invalid-plan]"]
+
+plan:
+  - task_type: broken
+    rationale: Circular dependencies.
+    confidence: 0.7
+    subtasks:
+      - {id: s1, description: First step, specialist: research, depends_on: [s2],
+         expected_output: notes}
+      - {id: s2, description: Second step, specialist: writing, depends_on: [s1],
+         expected_output: text}
+  - task_type: research_summary
+    rationale: Research first, then write.
+    confidence: 0.8
+    subtasks:
+      - {id: s1, description: First step, specialist: research, expected_output: notes}
+      - {id: s2, description: Second step, specialist: writing, depends_on: [s1],
+         expected_output: text}
