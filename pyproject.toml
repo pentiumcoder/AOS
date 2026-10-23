@@ -1,0 +1,55 @@
+[project]
+name = "aos"
+version = "0.1.0"
+description = "Multi-agent orchestration with tool use, memory and human-in-the-loop review"
+requires-python = ">=3.11"
+dependencies = [
+    "anthropic>=0.60",
+    "celery[redis]>=5.4",
+    "ddgs>=9.0",
+    "fakeredis>=2.26",
+    "fastapi>=0.115",
+    "httpx>=0.27",
+    "langgraph>=0.6",
+    "langgraph-checkpoint-postgres>=2.0",
+    "mcp>=1.10",
+    "openai>=1.90",
+    "psycopg[binary,pool]>=3.2",
+    "pydantic>=2.8",
+    "pydantic-settings>=2.4",
+    "pyyaml>=6.0",
+    "redis>=5.0",
+    "sqlalchemy>=2.0.30",
+    "uvicorn[standard]>=0.30",
+]
+
+[project.scripts]
+aos = "aos.__main__:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aos"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "mcp: spawns the demo MCP server as a subprocess",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+ignore = ["B008"]
