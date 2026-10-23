@@ -1,0 +1,29 @@
+# Provider chains per role, as provider:model. The first usable entry is primary and the
+# rest are fallbacks. Entries whose provider has no API key are skipped, so with no keys
+# every role runs on the local Ollama model.
+# Placeholders: {ollama_model} -> OLLAMA_MODEL, {openai_reviewer_model} -> OPENAI_REVIEWER_MODEL
+
+roles:
+  supervisor:
+    - anthropic:claude-opus-5-5
+    - ollama:{ollama_model}
+
+  reviewer:
+    - openai:{openai_reviewer_model}
+    - anthropic:claude-sonnet-5-5
+    - ollama:{ollama_model}
+
+  specialist:
+    low:
+      - anthropic:claude-haiku-5-5
+      - ollama:{ollama_model}
+    medium:
+      - anthropic:claude-sonnet-5-5
+      - ollama:{ollama_model}
+    high:
+      - anthropic:claude-sonnet-5-5
+      - ollama:{ollama_model}
+
+  default:
+    - anthropic:claude-sonnet-5-5
+    - ollama:{ollama_model}
