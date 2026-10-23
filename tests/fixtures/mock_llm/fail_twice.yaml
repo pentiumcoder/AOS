@@ -1,0 +1,17 @@
+# s1 can never be completed; s2 is independent and succeeds.
+match: ["[test:fail-twice]"]
+
+plan:
+  - task_type: research_summary
+    rationale: Pull warehouse figures and background research in parallel.
+    confidence: 0.8
+    subtasks:
+      - {id: s1, description: Query the sales warehouse, specialist: data_analysis,
+         expected_output: Monthly sales table}
+      - {id: s2, description: Search for market background, specialist: research,
+         expected_output: Bullet list with sources}
+
+subtasks:
+  s1:
+    - steps:
+        - final: {output: "", completed: false, blocker: warehouse connection refused}

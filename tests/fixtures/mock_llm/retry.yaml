@@ -1,0 +1,26 @@
+# The first attempt divides by zero and reports a blocker; the retry succeeds.
+match: ["[test:retry]"]
+
+plan:
+  - task_type: calculation
+    rationale: A single computation.
+    confidence: 0.8
+    subtasks:
+      - id: s1
+        description: Compute the mean of 2, 4 and 9
+        specialist: code
+        expected_output: The mean as a number
+
+subtasks:
+  s1:
+    - steps:
+        - tool: code_exec
+          args: {code: "print(sum([2, 4, 9]) / 0)"}
+        - final: {output: "", completed: false, blocker: "{{tool_output}}"}
+    - steps:
+        - tool: code_exec
+          args: {code: "print(sum([2, 4, 9]) / 3)"}
+        - final: {output: "The mean is {{tool_result.stdout}}", confidence: 0.9}
+
+synthesize:
+  - "{{outputs.s1}}"
