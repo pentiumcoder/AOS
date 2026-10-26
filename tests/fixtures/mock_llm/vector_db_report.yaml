@@ -36,6 +36,45 @@ plan:
         complexity: medium
         actions: [send_email]
 
+plan_with_memory:
+  - task_type: research_report
+    rationale: >-
+      Identify the leading databases from public sources while the benchmark analysis runs in
+      parallel, look up managed offerings once the shortlist is known, then write a summary
+      that uses only the computed figures and send it to the team.
+    confidence: 0.85
+    memory_influence:
+      - memory_id: "{{memory_ids_by_kind.approach.0}}"
+        how_used: Took throughput, latency and cost from the benchmark table, not web search
+      - memory_id: "{{memory_ids_by_kind.preference.0}}"
+        how_used: Kept the summary to bullet points under 200 words for the team email
+    subtasks:
+      - id: s1
+        description: Identify the three most widely adopted open-source vector databases and summarise their architecture and licence.
+        specialist: research
+        expected_output: Bullet list of three databases, each with licence, one-line architecture summary and a source URL
+        complexity: medium
+      - id: s2
+        description: Rank the databases in the internal benchmarks table by throughput and compute cost per million queries for the top three.
+        specialist: data_analysis
+        expected_output: Markdown table of the top three by QPS with p95 latency, recall@10, monthly cost and cost per 1M queries, plus the leader on each metric
+        complexity: medium
+      - id: s3
+        description: Find the managed cloud offering and pricing model for each database identified in s1.
+        specialist: research
+        depends_on: [s1]
+        inputs: {databases: "subtask:s1"}
+        expected_output: One bullet per database naming the managed service and how it is priced, with source URLs
+        complexity: low
+      - id: s4
+        description: Write an executive summary of at most 200 words comparing the three databases and recommending one, then email it to team@example.com.
+        specialist: writing
+        depends_on: [s1, s2, s3]
+        inputs: {shortlist: "subtask:s1", benchmarks: "subtask:s2", offerings: "subtask:s3"}
+        expected_output: Bullet-point executive summary under 200 words that uses the s2 figures exactly and cites sources
+        complexity: medium
+        actions: [send_email]
+
 subtasks:
   s1:
     - steps:

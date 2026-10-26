@@ -5,6 +5,18 @@ import pytest
 from aos.config import get_settings
 
 
+def pytest_addoption(parser):
+    parser.addoption(
+        "--services",
+        action="store_true",
+        help="run e2e tests against the API at API_URL instead of in-process",
+    )
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "e2e: drives the system through its HTTP API")
+
+
 def reset_state() -> None:
     from aos.agents.prompting import load_prompt
     from aos.db import cache, session
@@ -14,6 +26,8 @@ def reset_state() -> None:
     from aos.llm.mock_provider import MockProvider
     from aos.llm.router import reset_router
     from aos.memory.embeddings import get_embedder
+    from aos.observability.costs import pricing
+    from aos.observability.tracing import reset_tracing
     from aos.tools.builtin import demo_data
     from aos.tools.builtin.web_search import _fixtures as web_fixtures
     from aos.tools.registry import reset_registry
@@ -31,6 +45,8 @@ def reset_state() -> None:
     demo_data._seeded.clear()
     get_embedder.cache_clear()
     get_policy.cache_clear()
+    reset_tracing()
+    pricing.cache_clear()
 
 
 @pytest.fixture(autouse=True)
