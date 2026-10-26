@@ -37,7 +37,7 @@ def build_graph(checkpointer: BaseCheckpointSaver | None = None) -> CompiledStat
     )
     graph.add_conditional_edges("execute_actions", routing.after_actions, ["escalate", "deliver"])
     graph.add_conditional_edges(
-        "escalate", routing.after_escalation, ["schedule", "execute_actions", "deliver"]
+        "escalate", routing.after_escalation, ["plan", "schedule", "execute_actions", "deliver"]
     )
     graph.add_edge("deliver", "persist_memory")
     graph.add_edge("persist_memory", END)

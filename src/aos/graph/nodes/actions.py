@@ -15,13 +15,19 @@ FINAL_OUTPUT_TOKEN = "{{final_output}}"
 
 @traced_node("execute_actions")
 def execute_actions(state: dict[str, Any]) -> dict[str, Any]:
+    events: list[dict[str, Any]] = []
     if state.get("actions") is None:
-        return _propose(state)
+        proposal = _propose(state)
+        if proposal["pending_escalations"]:
+            return proposal
+        raw_actions, events = proposal["actions"], proposal["events"]
+    else:
+        raw_actions = state["actions"]
 
     registry = get_registry()
     final_output = state.get("final_output") or ""
-    actions, events = [], []
-    for raw in state["actions"]:
+    actions = []
+    for raw in raw_actions:
         action = ProposedAction.model_validate(raw)
         if action.status == "approved":
             # Checked again because a reviewer may have edited the arguments.
@@ -54,19 +60,26 @@ def _propose(state: dict[str, Any]) -> dict[str, Any]:
             action.status, action.result = "rejected", problem
             events.append(event("execute_actions", "rejected", f"{action.tool} blocked: {problem}"))
         actions.append(action)
-    pending = [a for a in actions if a.status == "proposed"]
-    if pending:
+    escalations = []
+    for action in (a for a in actions if a.status == "proposed"):
+        if request := action_escalation(action):
+            escalations.append(request)
+        else:
+            action.status = "approved"
+    if escalations:
         events.append(
             event(
                 "execute_actions",
                 "proposed",
-                f"{len(pending)} action(s) need approval: "
-                + ", ".join(f"{a.tool} from {a.subtask_id}" for a in pending),
+                f"{len(escalations)} action(s) need approval: "
+                + ", ".join(
+                    f"{a.tool} from {a.subtask_id}" for a in actions if a.status == "proposed"
+                ),
             )
         )
     return {
         "actions": [a.model_dump(mode="json") for a in actions],
-        "pending_escalations": [action_escalation(a) for a in pending],
+        "pending_escalations": escalations,
         "events": events,
     }
 
