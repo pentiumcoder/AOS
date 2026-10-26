@@ -118,7 +118,8 @@ class SpecialistAgent:
         approach_hint: str | None,
         state: Attempt | None = None,
     ) -> str:
-        inputs = "\n".join(f"- {key}: {value}" for key, value in subtask.inputs.items())
+        # Sorted so the prompt is identical whatever key order a stored plan comes back in.
+        inputs = "\n".join(f"- {key}: {value}" for key, value in sorted(subtask.inputs.items()))
         upstream = "\n\n".join(f"### {sid}\n{output}" for sid, output in dep_outputs.items())
         contacts = (
             policy.contacts_text(request) if state and "send_email" in state.offered else None
@@ -144,7 +145,7 @@ class SpecialistAgent:
             outcome = registry.invoke(self.name, call.name, call.args)
             if outcome.success:
                 state.used.append(call.name)
-                args = json.dumps(call.args, default=str)[:300]
+                args = json.dumps(call.args, default=str, sort_keys=True)[:300]
                 state.evidence.append(f"{call.name} {args}\n-> {outcome.as_text(EVIDENCE_CHARS)}")
             return outcome.as_text()
         return self._propose(call, reasoning, state)

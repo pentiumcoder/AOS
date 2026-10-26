@@ -7,6 +7,7 @@ from typing import Any, TypeVar
 import yaml
 from pydantic import BaseModel, ValidationError
 
+from aos import context
 from aos.config import get_settings
 from aos.llm import hooks
 from aos.llm.base import (
@@ -24,6 +25,7 @@ from aos.llm.base import (
 )
 from aos.llm.mock_provider import MockProvider
 from aos.logging import get_logger
+from aos.observability import costs, tracing
 
 log = get_logger(__name__)
 
@@ -114,18 +116,52 @@ class LLMClient:
         return retry
 
     def _call(self, provider: LLMProvider, request: LLMRequest) -> LLMResult:
-        delay = self.backoff_s
-        for attempt in range(self.retries + 1):
-            try:
-                result = provider.complete(request)
-            except TransientLLMError:
-                if attempt == self.retries:
-                    raise
-                time.sleep(delay)
-                delay *= 2
-                continue
-            hooks.emit(hooks.LLMCallRecord(request=request, result=result))
-            return result
+        attributes = {
+            "agent": request.role,
+            "purpose": request.meta.get("purpose"),
+            "provider": provider.name,
+            "model": provider.model,
+            "subtask_id": request.meta.get("subtask_id") or context.get("subtask_id"),
+            "attempt": request.meta.get("attempt") or context.get("attempt"),
+        }
+        with tracing.span("llm.call", **attributes) as span:
+            delay = self.backoff_s
+            for attempt in range(self.retries + 1):
+                try:
+                    result = provider.complete(request)
+                except TransientLLMError:
+                    if attempt == self.retries:
+                        raise
+                    time.sleep(delay)
+                    delay *= 2
+                    continue
+                cost = (
+                    0.0
+                    if result.replayed
+                    else costs.cost_of(
+                        result.provider,
+                        result.model,
+                        result.usage.input_tokens,
+                        result.usage.output_tokens,
+                    )
+                )
+                tracing.annotate(
+                    tokens__input=result.usage.input_tokens,
+                    tokens__output=result.usage.output_tokens,
+                    cost_usd=cost,
+                    latency_ms=round(result.latency_ms, 1),
+                    retries=attempt,
+                    replayed=result.replayed,
+                )
+                record = hooks.LLMCallRecord(
+                    request=request,
+                    result=result,
+                    span_id=tracing.current_span_id(),
+                    cost_usd=cost,
+                )
+                span.set_attribute("aos.call_key", record.call_key)
+                hooks.emit(record)
+                return result
         raise AssertionError("unreachable")
 
 
@@ -200,6 +236,12 @@ def providers_for(role: str, complexity: str = "medium") -> list[LLMProvider]:
 
 
 def get_llm(role: str, complexity: str = "medium") -> LLMClient:
+    from aos.replay.recorder import ReplayProvider, active_session
+
+    session = active_session(context.get("run_id"))
+    if session is not None:
+        replay = ReplayProvider(session, providers_for(role, complexity))
+        return LLMClient(role, [replay], retries=0)
     return LLMClient(role, providers_for(role, complexity))
 
 

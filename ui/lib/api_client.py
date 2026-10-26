@@ -80,3 +80,27 @@ class Api:
     def maintain(self, user_id: str | None = None) -> dict[str, Any]:
         params = {"user_id": user_id} if user_id else {}
         return self._call("POST", "/memory/maintenance", params=params)
+
+    def trace(self, run_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/runs/{run_id}/trace")
+
+    def span(self, span_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/spans/{span_id}")
+
+    def run_metrics(self, run_id: str) -> dict[str, Any]:
+        return self._call("GET", f"/runs/{run_id}/metrics")
+
+    def summary(self, days: int = 7) -> dict[str, Any]:
+        return self._call("GET", "/metrics/summary", params={"days": days})
+
+    def steps(self, run_id: str) -> list[dict[str, Any]]:
+        return self._call("GET", f"/runs/{run_id}/steps")
+
+    def replay(
+        self, run_id: str, mode: str = "recorded", overrides: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        body = {"mode": mode, "overrides": overrides or {}}
+        return self._call("POST", f"/runs/{run_id}/replay", json=body)
+
+    def compare(self, run_a: str, run_b: str) -> dict[str, Any]:
+        return self._call("GET", f"/runs/{run_a}/compare/{run_b}")

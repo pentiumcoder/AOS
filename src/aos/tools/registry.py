@@ -13,6 +13,7 @@ from aos import context
 from aos.config import get_settings
 from aos.llm.base import ToolDef
 from aos.logging import get_logger
+from aos.observability import tracing
 from aos.tools.base import ToolContext, ToolError, ToolResult, ToolSpec
 from aos.tools.config import tool_config
 from aos.tools.ratelimit import RateLimiter
@@ -61,6 +62,33 @@ class ToolRegistry:
         return None
 
     def invoke(self, agent: str, name: str, args: dict[str, Any]) -> ToolResult:
+        with tracing.span("tool.invoke", tool=name, agent=agent):
+            result = self._replayed(agent, name, args) or self._invoke(agent, name, args)
+            tracing.annotate(
+                success=result.success,
+                latency_ms=round(result.latency_ms, 1),
+                error=result.error,
+                status="success" if result.success else "warning",
+            )
+            _record(agent, name, args, result)
+            return result
+
+    def _replayed(self, agent: str, name: str, args: dict[str, Any]) -> ToolResult | None:
+        from aos.replay.recorder import active_session
+
+        replay = active_session(context.get("run_id"))
+        if replay is None:
+            return None
+        if self.is_sensitive(name):
+            tracing.annotate(replayed=True)
+            return ToolResult(tool=name, success=True, output={"skipped": "not run during replay"})
+        recorded = replay.tool_output(context.get("subtask_id"), agent, name, args)
+        if recorded is None:
+            return None
+        tracing.annotate(replayed=True)
+        return ToolResult(tool=name, **recorded)
+
+    def _invoke(self, agent: str, name: str, args: dict[str, Any]) -> ToolResult:
         start = perf_counter()
         output: Any = None
         error: str | None = None
@@ -80,15 +108,13 @@ class ToolRegistry:
             log.exception("tool crashed", extra={"fields": {"tool": name}})
             error = f"{type(exc).__name__}: {exc}"
 
-        result = ToolResult(
+        return ToolResult(
             tool=name,
             success=error is None,
             output=output,
             error=error,
             latency_ms=(perf_counter() - start) * 1000,
         )
-        _record(agent, name, args, result)
-        return result
 
     def _run(self, spec: ToolSpec, parsed: Any, agent: str) -> Any:
         run_id = context.get("run_id")
@@ -156,6 +182,7 @@ def _record(agent: str, name: str, args: dict[str, Any], result: ToolResult) -> 
                     success=result.success,
                     error=result.error,
                     latency_ms=result.latency_ms,
+                    span_id=tracing.current_span_id(),
                 )
             )
     except Exception:

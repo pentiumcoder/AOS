@@ -10,7 +10,9 @@ class ProposedAction(BaseModel):
     tool: str
     args: dict[str, Any] = Field(default_factory=dict)
     reasoning: str = ""
-    status: Literal["proposed", "approved", "rejected", "executed", "failed"] = "proposed"
+    status: Literal["proposed", "approved", "rejected", "executed", "skipped", "failed"] = (
+        "proposed"
+    )
     result: Any = None
 
 
