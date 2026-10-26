@@ -17,6 +17,12 @@ celery_app.conf.update(
     worker_prefetch_multiplier=1,
     broker_connection_retry_on_startup=True,
     task_ignore_result=True,
+    beat_schedule={
+        "memory-maintenance": {
+            "task": "aos.memory_maintenance",
+            "schedule": settings.memory_maintenance_minutes * 60,
+        }
+    },
 )
 
 
