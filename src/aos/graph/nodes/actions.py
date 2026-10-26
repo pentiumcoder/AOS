@@ -38,7 +38,10 @@ def execute_actions(state: dict[str, Any]) -> dict[str, Any]:
                     outcome = registry.invoke(
                         action.agent, action.tool, _fill(action.args, final_output)
                     )
-                action.status = "executed" if outcome.success else "failed"
+                skipped = isinstance(outcome.output, dict) and "skipped" in outcome.output
+                action.status = (
+                    "skipped" if skipped else "executed" if outcome.success else "failed"
+                )
                 action.result = outcome.output if outcome.success else outcome.error
             detail = f": {action.result}" if action.status == "rejected" else ""
             events.append(

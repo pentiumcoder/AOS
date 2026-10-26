@@ -29,7 +29,10 @@ def review(
         f"Expected output:\n{subtask.expected_output}"
         + section("Outputs of earlier subtasks", upstream)
         + section("Tool results the specialist saw", "\n\n".join(result.evidence))
-        + section("Structured data it reported", json.dumps(result.data) if result.data else None)
+        + section(
+            "Structured data it reported",
+            json.dumps(result.data, sort_keys=True) if result.data else None,
+        )
         + section("Automatic check", check)
         + f"\n\nWork to review:\n{result.output}"
     )

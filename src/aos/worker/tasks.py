@@ -21,6 +21,15 @@ def resume_run(run_id: str, decision: dict[str, Any]) -> str:
     return _outcome(resume_graph(run_id, decision))
 
 
+@celery_app.task(name="aos.replay_run")
+def replay_run(
+    run_id: str, parent_run_id: str, mode: str, overrides: dict[str, dict[str, Any]]
+) -> str:
+    from aos.replay.engine import run_replay
+
+    return _outcome(run_replay(run_id, parent_run_id, mode, overrides))
+
+
 @celery_app.task(name="aos.memory_maintenance")
 def memory_maintenance() -> dict[str, int]:
     from aos.memory.management import maintain

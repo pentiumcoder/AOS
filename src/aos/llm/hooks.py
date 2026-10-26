@@ -19,11 +19,16 @@ class LLMCallRecord:
     result: LLMResult
     run_id: str | None = field(default_factory=lambda: context.get("run_id"))
     subtask_id: str | None = field(default_factory=lambda: context.get("subtask_id"))
-    call_key: str | None = None
+    span_id: str | None = None
+    cost_usd: float | None = None
 
     @property
     def prompt_hash(self) -> str:
         return prompt_hash(self.request)
+
+    @property
+    def call_key(self) -> str:
+        return call_key(self.request)
 
 
 LLMHook = Callable[[LLMCallRecord], None]
@@ -56,6 +61,22 @@ def prompt_hash(request: LLMRequest) -> str:
         "schema": request.schema_name,
     }
     return hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+
+
+def call_key(request: LLMRequest) -> str:
+    """Identifies a call by who made it and where in the run, not by what it said.
+
+    A replay finds the recorded answer for the same position and then uses prompt_hash
+    to tell whether the inputs at that position have changed.
+    """
+    parts = [
+        request.role,
+        str(request.meta.get("purpose", "")),
+        str(request.meta.get("subtask_id") or context.get("subtask_id") or ""),
+        str(request.meta.get("attempt") or context.get("attempt") or ""),
+        str(len(request.messages)),
+    ]
+    return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
 
 
 def _dump(value: Any) -> Any:
@@ -98,5 +119,8 @@ def persist_llm_call(record: LLMCallRecord) -> None:
                 input_tokens=result.usage.input_tokens,
                 output_tokens=result.usage.output_tokens,
                 latency_ms=result.latency_ms,
+                cost_usd=record.cost_usd,
+                replayed=result.replayed,
+                span_id=record.span_id,
             )
         )

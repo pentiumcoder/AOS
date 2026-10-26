@@ -64,6 +64,7 @@ class LLMResult(BaseModel):
     provider: str
     model: str
     latency_ms: float = 0.0
+    replayed: bool = False
 
 
 class LLMError(Exception):

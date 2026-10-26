@@ -4,6 +4,8 @@ from aos.graph.instrument import traced_node
 from aos.logging import get_logger
 from aos.memory.extraction import remember_run
 from aos.memory.retrieval import SECTIONS, retrieve_for_planning
+from aos.observability import tracing
+from aos.replay.recorder import active_session
 from aos.schemas.state import event
 
 log = get_logger(__name__)
@@ -11,10 +13,20 @@ log = get_logger(__name__)
 
 @traced_node("retrieve_memory")
 def retrieve_memory(state: dict[str, Any]) -> dict[str, Any]:
+    replay = active_session(state["run_id"])
+    if replay is not None:
+        # Memory has changed since the original run; reuse what it recalled instead.
+        message = "reused the memories recalled by the original run"
+        return {
+            "memory_context": replay.memory_context,
+            "events": [event("retrieve_memory", "memory", message)],
+        }
     try:
-        recalled = retrieve_for_planning(
-            state.get("user_id") or "default", state["request"], run_id=state["run_id"]
-        )
+        with tracing.span("memory.retrieve"):
+            recalled = retrieve_for_planning(
+                state.get("user_id") or "default", state["request"], run_id=state["run_id"]
+            )
+            tracing.annotate(memory_ids=[m.id for m in recalled.memories()])
     except Exception as exc:
         log.exception("memory retrieval failed")
         return {
@@ -41,8 +53,12 @@ def retrieve_memory(state: dict[str, Any]) -> dict[str, Any]:
 def persist_memory(state: dict[str, Any]) -> dict[str, Any]:
     if state.get("plan") is None:
         return {}
+    if active_session(state["run_id"]) is not None:
+        return {"events": [event("persist_memory", "memory", "replay runs are not remembered")]}
     try:
-        stored = remember_run(state)
+        with tracing.span("memory.persist"):
+            stored = remember_run(state)
+            tracing.annotate(memory_ids=[memory.id for memory, _ in stored])
     except Exception as exc:
         # The deliverable is already saved; losing a memory must not fail the run.
         log.exception("memory persistence failed")
