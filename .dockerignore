@@ -1,0 +1,15 @@
+.git
+.venv
+.env
+.env.*
+!.env.example
+**/__pycache__
+.pytest_cache
+.ruff_cache
+workspace
+data
+chroma
+*.sqlite
+docs
+AGENTS.md
+CLAUDE.md

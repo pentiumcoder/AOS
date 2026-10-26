@@ -1,5 +1,33 @@
 name: aos
 
+x-app-env: &app-env
+  STORAGE_MODE: services
+  TASK_EXECUTION: celery
+  DATABASE_URL: postgresql+psycopg://aos:aos@postgres:5432/aos
+  REDIS_URL: redis://redis:6379/0
+  CHROMA_HOST: chromadb
+  CHROMA_PORT: "8000"
+  OLLAMA_BASE_URL: http://host.docker.internal:11434
+
+x-app: &app
+  build:
+    context: .
+    dockerfile: docker/app.Dockerfile
+  image: aos-app:latest
+  env_file:
+    - path: .env
+      required: false
+  environment: *app-env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+    chromadb:
+      condition: service_started
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -30,11 +58,52 @@ services:
       retries: 20
 
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:1.5.9
     ports:
       - "${AOS_CHROMA_PORT:-8001}:8000"
     volumes:
       - chromadata:/data
+
+  api:
+    <<: *app
+    command: uvicorn aos.api.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${AOS_API_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  worker:
+    <<: *app
+    command: celery -A aos.worker.celery_app worker -Q aos --concurrency 2 -l info
+
+  beat:
+    <<: *app
+    command: celery -A aos.worker.celery_app beat -l info --schedule /tmp/celerybeat-schedule
+
+  ui:
+    <<: *app
+    working_dir: /app/ui
+    command: streamlit run Home.py --server.port 8501 --server.address 0.0.0.0 --server.headless true --browser.gatherUsageStats false
+    environment:
+      <<: *app-env
+      API_URL: http://api:8000
+    ports:
+      - "${AOS_UI_PORT:-8501}:8501"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    profiles: [observability]
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
 
 volumes:
   pgdata:

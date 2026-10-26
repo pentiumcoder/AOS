@@ -9,6 +9,8 @@ from sqlalchemy.orm import Session, sessionmaker
 from aos.config import get_settings
 from aos.db.models import Base
 
+SCHEMA_LOCK_KEY = 7_210_431
+
 _engine: Engine | None = None
 _sessionmaker: sessionmaker[Session] | None = None
 
@@ -50,8 +52,26 @@ def session_scope() -> Iterator[Session]:
         session.close()
 
 
+@contextmanager
+def schema_lock() -> Iterator[None]:
+    if is_sqlite():
+        yield
+        return
+    # The api and worker start together; on an empty database their concurrent
+    # CREATE TABLEs collide on pg_type and Postgres fails the loser instead of waiting.
+    # Autocommit, because the checkpointer's CREATE INDEX CONCURRENTLY waits for every
+    # open transaction, including one holding this lock.
+    with get_engine().execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
+        conn.execute(text("SELECT pg_advisory_lock(:key)"), {"key": SCHEMA_LOCK_KEY})
+        try:
+            yield
+        finally:
+            conn.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": SCHEMA_LOCK_KEY})
+
+
 def init_db() -> None:
-    Base.metadata.create_all(get_engine())
+    with schema_lock():
+        Base.metadata.create_all(get_engine())
 
 
 def reset_db() -> None:
