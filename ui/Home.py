@@ -82,7 +82,7 @@ def show_task(task_id: str) -> None:
                 f"**{plan['task_type']}** · confidence {plan['confidence']:.2f} · "
                 f"{plan['rationale']}"
             )
-            st.dataframe(subtask_rows(run), hide_index=True, use_container_width=True)
+            st.dataframe(subtask_rows(run), hide_index=True, width="stretch")
             for influence in plan.get("memory_influence", []):
                 st.caption(
                     f"Shaped by memory {influence['memory_id'][:8]}: {influence['how_used']}"

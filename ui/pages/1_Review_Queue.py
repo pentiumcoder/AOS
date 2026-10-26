@@ -91,7 +91,7 @@ def decision_point(escalation: dict[str, Any], context: dict[str, Any]) -> None:
                 for s in plan["subtasks"]
             ],
             hide_index=True,
-            use_container_width=True,
+            width="stretch",
         )
     elif current:
         st.subheader(f"Subtask {current['subtask']['id']}: {current['subtask']['description']}")
@@ -182,7 +182,7 @@ def progress(escalation: dict[str, Any]) -> None:
     except ApiError as exc:
         st.error(str(exc))
         return
-    st.dataframe(subtask_rows(task["run"]), hide_index=True, use_container_width=True)
+    st.dataframe(subtask_rows(task["run"]), hide_index=True, width="stretch")
 
 
 def memories(context: dict[str, Any]) -> None:
