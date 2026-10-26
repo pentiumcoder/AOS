@@ -1,0 +1,16 @@
+# Confidence between the approval and notification thresholds: the reviewer is informed
+# but the run does not stop.
+match: ["[test:borderline]"]
+
+plan:
+  - task_type: research_summary
+    rationale: A single search should be enough.
+    confidence: 0.7
+    subtasks:
+      - {id: s1, description: Search for background on the request, specialist: research,
+         expected_output: Bullet list with sources}
+
+subtasks:
+  s1:
+    - steps:
+        - final: {output: "- Background notes. Source: https://example.org/notes", confidence: 0.7}

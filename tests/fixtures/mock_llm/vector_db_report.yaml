@@ -158,3 +158,26 @@ review:
 
 synthesize:
   - "{{outputs.s4}}\n\n### Benchmark detail\n\n{{outputs.s2}}"
+
+memory_extraction:
+  - memories:
+      - kind: approach
+        outcome: success
+        importance: 0.8
+        text: >-
+          For vector database comparisons, compute throughput, latency and cost per query
+          from the internal benchmarks table in a data_analysis subtask before any writing.
+      - kind: approach
+        outcome: failure
+        importance: 0.7
+        text: >-
+          A summary draft was rejected for quoting a throughput figure that the benchmark
+          analysis did not contain; writers must copy figures from the analysis exactly.
+      - kind: fact
+        importance: 0.6
+        text: >-
+          On the internal synthetic benchmark (10M 768-dimension vectors) Qdrant has the lowest
+          p95 latency at 14.9 ms and Milvus the highest throughput at 4,200 QPS.
+      - kind: preference
+        importance: 0.6
+        text: The user wants executive summaries emailed to the team at team@example.com.
