@@ -60,7 +60,12 @@ class ExecutionPlan(BaseModel):
 
 
 def infer_dependencies(plan: ExecutionPlan) -> ExecutionPlan:
-    """Add dependencies that a subtask's description or inputs name but depends_on omits."""
+    """Add dependencies the planner implied but left out of depends_on.
+
+    A subtask depends on any subtask its description or inputs name. A writing subtask
+    with no dependencies at all writes up the other subtasks' findings, so it depends on
+    every non-writing subtask that does not itself wait for it.
+    """
     ids = {s.id for s in plan.subtasks if any(ch.isdigit() for ch in s.id)}
     fixed = plan.model_copy(deep=True)
     for subtask in fixed.subtasks:
@@ -68,6 +73,13 @@ def infer_dependencies(plan: ExecutionPlan) -> ExecutionPlan:
         named = {token for token in re.findall(r"[\w-]+", text) if token in ids}
         missing = sorted(named - set(subtask.depends_on) - {subtask.id})
         subtask.depends_on = [*subtask.depends_on, *missing]
+    for subtask in fixed.subtasks:
+        if subtask.specialist == "writing" and not subtask.depends_on:
+            subtask.depends_on = [
+                other.id
+                for other in fixed.subtasks
+                if other.specialist != "writing" and subtask.id not in other.depends_on
+            ]
     return fixed
 
 
