@@ -1,0 +1,94 @@
+# First run: research quotes web figures, the reviewer rejects them, and the lesson is
+# stored. A later similar run recalls the lesson and plans a benchmark query instead.
+match: ["[test:learning]"]
+
+plan:
+  - task_type: performance_summary
+    rationale: Look up published latency figures, then summarise them.
+    confidence: 0.75
+    subtasks:
+      - id: s1
+        description: Search the web for latency figures of popular vector databases
+        specialist: research
+        expected_output: Latency figures per database with sources
+        complexity: low
+      - id: s2
+        description: Summarise the latency figures from s1 in three bullet points
+        specialist: writing
+        depends_on: [s1]
+        expected_output: Three bullet points with figures
+        complexity: low
+
+plan_with_memory:
+  - task_type: performance_summary
+    rationale: A past run showed web figures get rejected, so query the internal benchmark.
+    confidence: 0.85
+    memory_influence:
+      - memory_id: "{{memory_ids_by_kind.approach.0}}"
+        how_used: Took latency figures from the benchmarks table instead of web search
+    subtasks:
+      - id: d1
+        description: Query the benchmarks table for p95 latency per database, fastest first
+        specialist: data_analysis
+        expected_output: Each database with its p95 latency in ms
+        complexity: low
+      - id: d2
+        description: Summarise the latency figures from d1 in three bullet points
+        specialist: writing
+        depends_on: [d1]
+        expected_output: Three bullet points with figures
+        complexity: low
+
+subtasks:
+  s1:
+    - steps:
+        - tool: web_search
+          args: {query: vector database latency benchmark, max_results: 3}
+        - final:
+            output: "Published latency: Milvus about 5 ms, Qdrant about 3 ms (vendor blogs)."
+            confidence: 0.5
+  s2:
+    - steps:
+        - final:
+            output: "- Qdrant is fastest at about 3 ms\n- Milvus follows at about 5 ms\n- Figures come from vendor blogs"
+            confidence: 0.6
+    - steps:
+        - final:
+            output: "- Qdrant is fastest\n- Milvus is second\n- No internal figures were available"
+            confidence: 0.6
+
+  d1:
+    - steps:
+        - tool: db_query
+          args: {sql: "SELECT database, p95_latency_ms FROM benchmarks ORDER BY p95_latency_ms LIMIT 3"}
+        - final:
+            output: >-
+              {{tool_result.rows.0.0}} {{tool_result.rows.0.1}} ms,
+              {{tool_result.rows.1.0}} {{tool_result.rows.1.1}} ms,
+              {{tool_result.rows.2.0}} {{tool_result.rows.2.1}} ms
+            confidence: 0.9
+  d2:
+    - steps:
+        - final:
+            output: "- Qdrant is fastest at 14.9 ms\n- Milvus follows at 18.4 ms\n- Weaviate is third at 21.7 ms"
+            confidence: 0.9
+
+review:
+  s2:
+    - approved: false
+      score: 0.4
+      issues: [The figures come from vendor blogs, not from our benchmark data.]
+      feedback: Use figures from the internal benchmarks table.
+    - approved: true
+      score: 0.75
+      issues: []
+      feedback: Acceptable without figures.
+
+memory_extraction:
+  - memories:
+      - kind: approach
+        outcome: failure
+        importance: 0.8
+        text: >-
+          Latency summaries built from web search figures were rejected; answer vector
+          database latency questions from the internal benchmarks table with db_query.

@@ -16,8 +16,8 @@ def messages(final: dict, kind: str | None = None) -> list[str]:
     return [e["message"] for e in final["events"] if kind is None or e["kind"] == kind]
 
 
-def test_showcase_run_end_to_end(db):
-    final, task_id, run_id = run(VECTOR_REQUEST)
+def test_showcase_run_end_to_end(db, finish):
+    final, task_id, run_id = finish(VECTOR_REQUEST)
 
     assert final["subtask_status"] == {"s1": "done", "s2": "done", "s3": "done", "s4": "done"}
     assert "dispatching s1, s2 in parallel" in messages(final, "dispatch")
@@ -27,7 +27,9 @@ def test_showcase_run_end_to_end(db):
     assert "### Benchmark detail" in final["final_output"]
 
     assert [(a["tool"], a["status"]) for a in final["actions"]] == [("send_email", "executed")]
-    assert [e["trigger"] for e in final["escalations"]] == ["sensitive_operation"]
+    assert [(e["trigger"], e["decision"]) for e in final["escalations"]] == [
+        ("sensitive_operation", "approve")
+    ]
     email = db.query(OutboxMessage).filter_by(run_id=run_id).one()
     assert email.body == final["final_output"]
 
@@ -55,17 +57,23 @@ def test_failed_subtask_is_retried_with_alternative_approach():
     assert final["final_output"].strip() == "The mean is 5.0"
 
 
-def test_second_failure_escalates_and_run_continues_with_partial_results():
-    final, _, _ = run("[test:fail-twice] sales summary")
-    assert final["subtask_status"] == {"s1": "failed", "s2": "done"}
+def test_second_failure_escalates_for_a_human_to_take_over(finish):
+    from aos.schemas.escalation import HumanDecision
+
+    def take_over(escalation):
+        return HumanDecision(action="take_over", payload="March sales: 1,240 units")
+
+    final, _, _ = finish("[test:fail-twice] sales summary", decide=take_over)
+    assert final["subtask_status"] == {"s1": "done", "s2": "done"}
+    assert final["results"]["s1"]["specialist"] == "human"
     assert [(e["trigger"], e["level"]) for e in final["escalations"]] == [
         ("repeated_specialist_failure", "TAKE_OVER")
     ]
-    assert final["final_output"]
+    assert "March sales: 1,240 units" in final["final_output"]
 
 
-def test_low_plan_confidence_escalates_before_work_starts():
-    final, _, _ = run("[test:low-confidence] do the thing")
+def test_low_plan_confidence_escalates_before_work_starts(finish):
+    final, _, _ = finish("[test:low-confidence] do the thing")
     assert [(e["trigger"], e["level"]) for e in final["escalations"]] == [
         ("low_plan_confidence", "APPROVE_PLAN")
     ]
@@ -73,16 +81,16 @@ def test_low_plan_confidence_escalates_before_work_starts():
     assert order.index("escalate") < order.index("schedule")
 
 
-def test_low_review_score_after_max_revisions_escalates():
-    final, _, _ = run("[test:low-score] announce the feature")
+def test_low_review_score_after_max_revisions_escalates(finish):
+    final, _, _ = finish("[test:low-score] announce the feature")
     assert final["visits"]["s1"] == 3
     assert final["revisions"]["s1"] == 2
     assert [e["trigger"] for e in final["escalations"]] == ["low_review_score"]
     assert final["subtask_status"]["s1"] == "done"
 
 
-def test_requested_human_review_escalates_the_deliverable():
-    final, _, _ = run("What is a vector index?", require_human_review=True)
+def test_requested_human_review_escalates_the_deliverable(finish):
+    final, _, _ = finish("What is a vector index?", require_human_review=True)
     assert [(e["trigger"], e["origin"]) for e in final["escalations"]] == [
         ("user_requested_review", "synthesize")
     ]

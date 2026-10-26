@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 
 from aos.config import get_settings
@@ -8,8 +10,10 @@ def reset_state() -> None:
     from aos.db import cache, session
     from aos.graph.builder import reset_graph
     from aos.graph.checkpointer import reset_checkpointer
+    from aos.hitl.policy import get_policy
     from aos.llm.mock_provider import MockProvider
     from aos.llm.router import reset_router
+    from aos.memory.embeddings import get_embedder
     from aos.tools.builtin import demo_data
     from aos.tools.builtin.web_search import _fixtures as web_fixtures
     from aos.tools.registry import reset_registry
@@ -25,6 +29,8 @@ def reset_state() -> None:
     load_prompt.cache_clear()
     web_fixtures.cache_clear()
     demo_data._seeded.clear()
+    get_embedder.cache_clear()
+    get_policy.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -36,6 +42,10 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("MCP_ENABLED", "false")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
+    # The in-memory Chroma client is shared by the whole process, so each test gets its
+    # own collection instead of a new client.
+    collection = f"test_{uuid.uuid4().hex[:12]}"
+    monkeypatch.setenv("CHROMA_COLLECTION", collection)
     reset_state()
 
     from aos.db import get_redis, init_db
@@ -43,7 +53,16 @@ def isolated_env(tmp_path, monkeypatch):
     init_db()
     get_redis().flushall()
     yield
+    _drop_collection(collection)
     reset_state()
+
+
+def _drop_collection(name: str) -> None:
+    from aos.memory.longterm import chroma_client
+
+    client = chroma_client()
+    if name in {c.name for c in client.list_collections()}:
+        client.delete_collection(name)
 
 
 @pytest.fixture
@@ -52,3 +71,21 @@ def db():
 
     with session_scope() as session:
         yield session
+
+
+def approve(escalation):
+    from aos.schemas.escalation import HumanDecision
+
+    return HumanDecision(action="approve", reviewer="tester")
+
+
+@pytest.fixture
+def finish():
+    """Run a task to the end, answering each escalation with decide (approve by default)."""
+    from aos.graph.runner import create_task, run_to_completion
+
+    def run(request, decide=approve, **task_fields):
+        task_id, run_id = create_task(request, **task_fields)
+        return run_to_completion(run_id, decide), task_id, run_id
+
+    return run
