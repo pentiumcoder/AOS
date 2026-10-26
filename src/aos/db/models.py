@@ -170,3 +170,19 @@ class MemoryRetrieval(Base):
     score: Mapped[float] = mapped_column(Float)
     used_in_plan: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Span(Base):
+    __tablename__ = "spans"
+
+    span_id: Mapped[str] = mapped_column(String(16), primary_key=True)
+    trace_id: Mapped[str] = mapped_column(String(32), index=True)
+    parent_span_id: Mapped[str | None] = mapped_column(String(16))
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    status: Mapped[str] = mapped_column(String(16))
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    end_time: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    duration_ms: Mapped[float] = mapped_column(Float)
+    attributes: Mapped[dict[str, Any]]
+    events: Mapped[list[Any]] = mapped_column(default=list)
