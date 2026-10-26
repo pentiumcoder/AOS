@@ -43,7 +43,7 @@ else:
             for m in found
         ],
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "weight": st.column_config.ProgressColumn(
                 "weight", min_value=0.0, max_value=1.0, format="%.2f"
