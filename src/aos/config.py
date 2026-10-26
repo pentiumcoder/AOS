@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     specialist_max_steps: int = 6
     graph_recursion_limit: int = 100
 
+    otel_service_name: str = "aos"
+    otel_exporter_otlp_endpoint: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:
