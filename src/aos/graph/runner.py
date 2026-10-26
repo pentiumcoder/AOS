@@ -1,4 +1,7 @@
+from collections.abc import Callable
 from typing import Any
+
+from langgraph.types import Command
 
 from aos.config import get_settings
 from aos.db.models import Run, Task, new_id, utcnow
@@ -6,6 +9,7 @@ from aos.db.session import session_scope
 from aos.graph.builder import get_graph
 from aos.graph.helpers import update_run, update_task
 from aos.logging import get_logger
+from aos.schemas.escalation import HumanDecision
 from aos.schemas.state import TaskState
 
 log = get_logger(__name__)
@@ -65,11 +69,41 @@ def execute_run(run_id: str) -> dict[str, Any]:
         run = session.get(Run, run_id)
         if run is None:
             raise KeyError(f"unknown run: {run_id}")
-        task = run.task
-        state = initial_state(task, run)
-        thread_id, task_id = run.thread_id, task.id
+        state = initial_state(run.task, run)
+    return _invoke(run_id, state)
+
+
+def resume_run(run_id: str, decision: dict[str, Any]) -> dict[str, Any]:
+    return _invoke(run_id, Command(resume=decision))
+
+
+def is_paused(final: dict[str, Any]) -> bool:
+    return bool(final.get("__interrupt__"))
+
+
+def run_to_completion(
+    run_id: str, decide: Callable[[dict[str, Any]], HumanDecision], max_decisions: int = 20
+) -> dict[str, Any]:
+    """Run, answering every escalation with decide(); for scripted demos and tests."""
+    from aos.hitl.queue import list_escalations, record_decision
+
+    final = execute_run(run_id)
+    for _ in range(max_decisions):
+        if not is_paused(final):
+            return final
+        [escalation] = list_escalations(status="pending", run_id=run_id)
+        decision = decide(escalation)
+        record_decision(escalation["id"], decision)
+        final = resume_run(run_id, decision.model_dump(mode="json"))
+    raise RuntimeError(f"run {run_id} still paused after {max_decisions} decisions")
+
+
+def _invoke(run_id: str, payload: Any) -> dict[str, Any]:
+    with session_scope() as session:
+        run = session.get(Run, run_id)
+        thread_id, task_id = run.thread_id, run.task_id
     try:
-        return get_graph().invoke(state, run_config(thread_id))
+        return get_graph().invoke(payload, run_config(thread_id))
     except Exception as exc:
         log.exception("run crashed", extra={"fields": {"run_id": run_id}})
         error = f"{type(exc).__name__}: {exc}"

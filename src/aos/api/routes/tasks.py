@@ -9,6 +9,7 @@ from aos.config import get_settings
 from aos.db.models import Run, Task, ToolCall, utcnow
 from aos.db.session import session_scope
 from aos.graph.runner import create_task, execute_run, run_state
+from aos.hitl.queue import list_escalations
 from aos.logging import get_logger
 
 log = get_logger(__name__)
@@ -59,6 +60,8 @@ class RunView(BaseModel):
     subtasks: list[SubtaskView]
     actions: list[dict[str, Any]]
     escalations: list[dict[str, Any]]
+    pending_escalations: list[dict[str, Any]]
+    memory: dict[str, Any] | None
     events: list[dict[str, Any]]
 
 
@@ -195,5 +198,10 @@ def _run_view(run: Run) -> RunView:
         subtasks=subtasks,
         actions=state.get("actions") or [],
         escalations=state.get("escalations") or [],
+        pending_escalations=[
+            {k: row[k] for k in ("id", "level", "trigger", "reason", "subtask_id", "action_id")}
+            for row in list_escalations(status="pending", run_id=run.id)
+        ],
+        memory=state.get("memory_context"),
         events=state.get("events") or [],
     )

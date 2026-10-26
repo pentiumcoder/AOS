@@ -34,8 +34,23 @@ def cmd_run(args: argparse.Namespace) -> int:
         return 0
 
     print(f"task {task_id} (run {run_id})\n")
-    final = execute_run(run_id)
+    if args.auto_approve:
+        from aos.graph.runner import run_to_completion
+        from aos.schemas.escalation import HumanDecision
+
+        def approve(escalation: dict[str, Any]) -> HumanDecision:
+            print(
+                f"[auto-approve] {escalation['level']} {escalation['trigger']}: "
+                f"{escalation['reason']}"
+            )
+            return HumanDecision(action="approve", reviewer="cli", comment="auto-approved")
+
+        final = run_to_completion(run_id, approve)
+    else:
+        final = execute_run(run_id)
     _print_report(final, run_id)
+    if final.get("__interrupt__"):
+        return 0
     return 0 if final.get("final_output") else 1
 
 
@@ -74,12 +89,38 @@ def cmd_llm_smoke(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def cmd_memory(args: argparse.Namespace) -> int:
+    from aos.memory.longterm import LongTermMemory
+    from aos.memory.management import forget_user, maintain
+    from aos.memory.scoring import effective_importance
+
+    if args.action == "maintain":
+        print(maintain(args.user).model_dump_json(indent=2))
+        return 0
+    if args.user is None:
+        print("--user is required")
+        return 2
+    if args.action == "forget":
+        print(forget_user(args.user))
+        return 0
+    for memory in LongTermMemory().list_user(args.user):
+        print(f"[{memory.kind}] {effective_importance(memory):.2f} {memory.text[:100]}")
+    return 0
+
+
 def _print_report(final: dict[str, Any], run_id: str) -> None:
     from aos.db import session_scope
     from aos.db.models import OutboxMessage
 
     for item in final.get("events", []):
         print(f"[{item['node']}] {item['message']}")
+    if final.get("__interrupt__"):
+        waiting = final["__interrupt__"][0].value
+        print(
+            f"\npaused for a human: {waiting['level']} {waiting['trigger']} - {waiting['reason']}"
+            f"\ndecide with POST /escalations/{waiting['escalation_id']}/decision"
+        )
+        return
     print("\n" + "=" * 72)
     print(final.get("final_output") or f"no deliverable: {final.get('error')}")
     print("=" * 72)
@@ -104,10 +145,18 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--user", default="default")
     run.add_argument("--review", action="store_true", help="require human review of the result")
     run.add_argument("--sync", action="store_true", help="run in this process instead of Celery")
+    run.add_argument(
+        "--auto-approve", action="store_true", help="approve every escalation (with --sync)"
+    )
     run.set_defaults(func=cmd_run)
 
     smoke = sub.add_parser("llm-smoke", help="check that each role can reach a model")
     smoke.set_defaults(func=cmd_llm_smoke)
+
+    memory = sub.add_parser("memory", help="inspect or maintain long-term memory")
+    memory.add_argument("action", choices=["maintain", "list", "forget"])
+    memory.add_argument("--user", default=None)
+    memory.set_defaults(func=cmd_memory)
     return parser
 
 
