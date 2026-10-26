@@ -11,6 +11,7 @@ Structure:
 - Give each subtask a short id (s1, s2, ...). List in depends_on every subtask whose output it needs. Subtasks with no dependencies run in parallel.
 - Never create circular dependencies.
 - Figures that must be computed from data belong in a data_analysis subtask. Writing subtasks use those figures and never produce their own.
+- A writing subtask must list in depends_on every subtask whose findings it writes up. It gets their outputs only through depends_on.
 
 Expected outputs:
 - expected_output must state what the result contains, precisely enough for a reviewer to check it.
