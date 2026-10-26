@@ -8,8 +8,10 @@ from aos.graph.instrument import traced_node
 from aos.graph.routing import RESUME_AT
 from aos.hitl.levels import ApprovalLevel
 from aos.hitl.notifications import notify
-from aos.hitl.queue import open_escalation
+from aos.hitl.queue import get_escalation, open_escalation
 from aos.memory import WorkingMemory
+from aos.observability import tracing
+from aos.replay.recorder import active_session
 from aos.schemas import ExecutionPlan, SpecialistResult, validate_plan
 from aos.schemas.escalation import HumanDecision
 from aos.schemas.state import event
@@ -42,48 +44,14 @@ def escalate(state: dict[str, Any]) -> dict[str, Any]:
         resume_at=RESUME_AT.get(origin, "deliver"),
     )
     for request in pending:
-        escalation, created = open_escalation(state, request)
-        if created:
-            notify(escalation)
-        if request["level"] == ApprovalLevel.NOTIFY:
-            outcome.records.append({**request, "escalation_id": escalation["id"], "decision": None})
-            outcome.events.append(
-                event("escalate", "notify", f"{request['trigger']}: {request['reason']}")
-            )
-            continue
-        update_run(state["run_id"], status="awaiting_human")
-        update_task(state["task_id"], status="awaiting_human")
-        # LangGraph re-runs this node from the top on every resume and hands back answers in
-        # call order, so interrupt() must be reached for each escalation every time.
-        answer = interrupt(
-            {
-                "escalation_id": escalation["id"],
-                "level": request["level"],
-                "trigger": request["trigger"],
-                "reason": request["reason"],
-            }
-        )
-        decision = HumanDecision.model_validate(answer)
-        apply_decision(outcome, request, decision)
-        outcome.records.append(
-            {
-                **request,
-                "escalation_id": escalation["id"],
-                "decision": decision.action,
-                "comment": decision.comment,
-                "resolved_by": decision.reviewer,
-            }
-        )
-        outcome.events.append(
-            event(
-                "escalate",
-                "decision",
-                f"{request['trigger']} ({request['level']}): {decision.reviewer} chose "
-                f"{decision.action}" + (f" - {decision.comment}" if decision.comment else ""),
-                trigger=request["trigger"],
-                level=request["level"],
-            )
-        )
+        with tracing.span(
+            "hitl.escalation",
+            escalation__level=request["level"],
+            escalation__trigger=request["trigger"],
+            subtask_id=request.get("subtask_id"),
+            status="escalated",
+        ):
+            _handle(outcome, state, request)
 
     update_run(state["run_id"], status="running")
     update_task(state["task_id"], status="running")
@@ -101,6 +69,81 @@ def escalate(state: dict[str, Any]) -> dict[str, Any]:
     if outcome.actions is not None:
         update["actions"] = outcome.actions
     return update
+
+
+def _handle(outcome: Outcome, state: dict[str, Any], request: dict[str, Any]) -> None:
+    replay = active_session(state["run_id"])
+    if replay is not None:
+        _replay_decision(outcome, request, replay.decision_for(request["trigger"]))
+        return
+    escalation, created = open_escalation(state, request)
+    if created:
+        notify(escalation)
+    tracing.annotate(escalation__id=escalation["id"])
+    if request["level"] == ApprovalLevel.NOTIFY:
+        outcome.records.append({**request, "escalation_id": escalation["id"], "decision": None})
+        outcome.events.append(
+            event("escalate", "notify", f"{request['trigger']}: {request['reason']}")
+        )
+        return
+    update_run(state["run_id"], status="awaiting_human")
+    update_task(state["task_id"], status="awaiting_human")
+    # LangGraph re-runs this node from the top on every resume and hands back answers in
+    # call order, so interrupt() must be reached for each escalation every time.
+    answer = interrupt(
+        {
+            "escalation_id": escalation["id"],
+            "level": request["level"],
+            "trigger": request["trigger"],
+            "reason": request["reason"],
+        }
+    )
+    decision = HumanDecision.model_validate(answer)
+    decided = get_escalation(escalation["id"]) or {}
+    tracing.annotate(
+        escalation__decision=decision.action,
+        escalation__reviewer=decision.reviewer,
+        review_seconds=decided.get("review_seconds"),
+    )
+    apply_decision(outcome, request, decision)
+    outcome.records.append(
+        {
+            **request,
+            "escalation_id": escalation["id"],
+            "decision": decision.action,
+            "comment": decision.comment,
+            "resolved_by": decision.reviewer,
+        }
+    )
+    outcome.events.append(
+        event(
+            "escalate",
+            "decision",
+            f"{request['trigger']} ({request['level']}): {decision.reviewer} chose "
+            f"{decision.action}" + (f" - {decision.comment}" if decision.comment else ""),
+            trigger=request["trigger"],
+            level=request["level"],
+        )
+    )
+
+
+def _replay_decision(outcome: Outcome, request: dict[str, Any], decision: HumanDecision) -> None:
+    if request["level"] == ApprovalLevel.NOTIFY:
+        outcome.records.append({**request, "decision": None, "replayed": True})
+        return
+    tracing.annotate(escalation__decision=decision.action, escalation__reviewer=decision.reviewer)
+    apply_decision(outcome, request, decision)
+    outcome.records.append(
+        {**request, "decision": decision.action, "resolved_by": decision.reviewer, "replayed": True}
+    )
+    outcome.events.append(
+        event(
+            "escalate",
+            "decision",
+            f"{request['trigger']} ({request['level']}): reused {decision.reviewer}'s "
+            f"{decision.action} from the original run",
+        )
+    )
 
 
 def apply_decision(outcome: Outcome, request: dict[str, Any], decision: HumanDecision) -> None:

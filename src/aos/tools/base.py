@@ -55,7 +55,13 @@ class ToolResult(BaseModel):
     def as_text(self, limit: int = 6000) -> str:
         if not self.success:
             return f"ERROR: {self.error}"
-        text = self.output if isinstance(self.output, str) else json.dumps(self.output, default=str)
+        # Sorted keys keep the text identical after a round trip through Postgres JSONB,
+        # which replay relies on when it compares prompts.
+        text = (
+            self.output
+            if isinstance(self.output, str)
+            else json.dumps(self.output, default=str, sort_keys=True)
+        )
         if len(text) <= limit:
             return text
         return f"{text[:limit]}... [truncated {len(text) - limit} chars]"
