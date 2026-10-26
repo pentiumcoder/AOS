@@ -83,7 +83,8 @@ class MockProvider(LLMProvider):
         return index
 
     def _plan(self, script, request):
-        entries = script.get("plan") or []
+        remembered = request.meta.get("has_memory") and script.get("plan_with_memory")
+        entries = remembered or script.get("plan") or []
         if not entries:
             raise KeyError(f"mock scenario {script['name']} has no plan")
         index = self._next("plan", request)
@@ -125,6 +126,18 @@ class MockProvider(LLMProvider):
         verdict = _pick(entries, attempt) if entries else DEFAULT_REVIEW
         return "", _render(verdict, _base_ctx(request)), []
 
+    def _memory_extraction(self, script, request):
+        entries = script.get("memory_extraction") or [{"memories": []}]
+        index = self._next("memory_extraction", request)
+        return "", _render(_pick(entries, index), _base_ctx(request)), []
+
+    def _escalation_chat(self, script, request):
+        return f"This was escalated because {request.meta.get('reason')}.", None, []
+
+    def _memory_consolidation(self, script, request):
+        texts = request.meta.get("texts") or [""]
+        return "", {"text": f"{texts[0]} (seen {len(texts)} times)"}, []
+
     def _default(self, script, request):
         entries = script.get(str(request.meta.get("purpose")))
         if entries:
@@ -158,9 +171,12 @@ def _base_ctx(request: LLMRequest) -> dict[str, Any]:
 def _lookup(ctx: dict[str, Any], path: str) -> Any:
     value: Any = ctx
     for part in path.split("."):
-        if not isinstance(value, dict) or part not in value:
+        if isinstance(value, list) and part.isdigit() and int(part) < len(value):
+            value = value[int(part)]
+        elif isinstance(value, dict) and part in value:
+            value = value[part]
+        else:
             raise KeyError(path)
-        value = value[part]
     return value
 
 

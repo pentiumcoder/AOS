@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from aos import __version__
-from aos.api.routes import tasks
+from aos.api.routes import escalations, memory, tasks
 from aos.config import get_settings
 from aos.db import get_redis, init_db
 from aos.db.session import ping
@@ -20,6 +20,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
 app = FastAPI(title="Agent Orchestration System", version=__version__, lifespan=lifespan)
 app.include_router(tasks.router)
+app.include_router(memory.router)
+app.include_router(escalations.router)
 
 
 @app.get("/health", tags=["system"])
