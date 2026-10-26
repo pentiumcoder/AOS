@@ -64,3 +64,19 @@ def test_dependencies_named_in_description_or_inputs_are_added():
     assert plan.subtask("s3").depends_on == ["s1"]
     assert plan.subtask("s4").depends_on == ["s3", "s2"]
     assert plan.subtask("s1").depends_on == []
+
+
+def test_writing_without_dependencies_waits_for_the_findings():
+    from aos.schemas.plan import infer_dependencies
+
+    writer = step("s3", "writing")
+    writer.description = "Format the result into two bullet points"
+    reviewer_note = step("s4", "research", ["s3"])
+    plan = infer_dependencies(
+        make_plan(step("s1", "data_analysis"), step("s2"), writer, reviewer_note)
+    )
+    assert plan.subtask("s3").depends_on == ["s1", "s2"]
+    assert validate_plan(plan) == []
+
+    lone = infer_dependencies(make_plan(step("s1", "writing")))
+    assert lone.subtask("s1").depends_on == []
