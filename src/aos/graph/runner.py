@@ -9,6 +9,8 @@ from aos.db.session import session_scope
 from aos.graph.builder import get_graph
 from aos.graph.helpers import update_run, update_task
 from aos.logging import get_logger
+from aos.observability import tracing
+from aos.observability.costs import record_run_metrics
 from aos.schemas.escalation import HumanDecision
 from aos.schemas.state import TaskState
 
@@ -101,15 +103,35 @@ def run_to_completion(
 def _invoke(run_id: str, payload: Any) -> dict[str, Any]:
     with session_scope() as session:
         run = session.get(Run, run_id)
-        thread_id, task_id = run.thread_id, run.task_id
+        thread_id, task_id, parent = run.thread_id, run.task_id, run.traceparent
+    resume = isinstance(payload, Command)
     try:
-        return get_graph().invoke(payload, run_config(thread_id))
+        with tracing.run_span(run_id, task_id, resume=resume, traceparent=parent) as span:
+            if not resume:
+                update_run(
+                    run_id, trace_id=tracing.trace_id(span), traceparent=tracing.traceparent(span)
+                )
+            final = get_graph().invoke(payload, run_config(thread_id))
+            if is_paused(final):
+                span.set_attribute("aos.status", "escalated")
+            else:
+                metrics = record_run_metrics(run_id)
+                span.set_attributes(
+                    {
+                        "aos.cost_usd": metrics["llm"]["cost_usd"],
+                        "aos.tokens.input": metrics["llm"]["input_tokens"],
+                        "aos.tokens.output": metrics["llm"]["output_tokens"],
+                    }
+                )
+        return final
     except Exception as exc:
         log.exception("run crashed", extra={"fields": {"run_id": run_id}})
         error = f"{type(exc).__name__}: {exc}"
         update_run(run_id, status="failed", error=error, ended_at=utcnow())
         update_task(task_id, status="failed", completed_at=utcnow())
         raise
+    finally:
+        tracing.flush()
 
 
 def run_state(thread_id: str) -> dict[str, Any]:
