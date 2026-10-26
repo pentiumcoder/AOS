@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from aos import context
 from aos.agents.prompting import render, section
 from aos.agents.specialists import SPECIALIST_AGENTS
@@ -5,6 +7,9 @@ from aos.llm import Message, get_llm
 from aos.schemas import ExecutionPlan, SpecialistResult, validate_plan
 from aos.schemas.plan import MAX_SUBTASKS, infer_dependencies
 from aos.tools.registry import get_registry
+
+if TYPE_CHECKING:
+    from aos.memory.retrieval import PlanningContext
 
 
 class PlanningError(Exception):
@@ -23,14 +28,21 @@ def specialist_catalog() -> str:
 
 
 def plan(
-    request: str, *, memory_context: str | None = None, feedback: str | None = None
+    request: str, *, memory: "PlanningContext | None" = None, feedback: str | None = None
 ) -> ExecutionPlan:
     system = render("supervisor_plan", specialists=specialist_catalog(), max_subtasks=MAX_SUBTASKS)
+    recalled = memory if memory is not None and not memory.is_empty() else None
     prompt = (
         f"Request:\n{request}"
-        + section("What you remember", memory_context)
+        + section("What you remember", recalled.render() if recalled else None)
         + section("Feedback on the previous plan", feedback)
     )
+    meta = {
+        "purpose": "plan",
+        "request": request,
+        "has_memory": recalled is not None,
+        "memory_ids_by_kind": recalled.ids_by_kind() if recalled else {},
+    }
     messages = [Message.user(prompt)]
     errors: list[str] = []
     with context.bind(agent="supervisor"):
@@ -41,18 +53,28 @@ def plan(
                 system=system,
                 schema=ExecutionPlan,
                 max_tokens=4096,
-                meta={"purpose": "plan", "request": request},
+                meta=meta,
             )
             candidate = infer_dependencies(result.parsed)
             errors = validate_plan(candidate)
             if not errors:
-                return candidate
+                return _ground_influence(candidate, recalled)
             problems = "\n".join(f"- {error}" for error in errors)
             messages += [
                 Message.assistant(candidate.model_dump_json()),
                 Message.user(f"The plan is invalid:\n{problems}\nReturn a corrected plan."),
             ]
     raise PlanningError("plan still invalid after re-planning", errors)
+
+
+def _ground_influence(plan: ExecutionPlan, memory: "PlanningContext | None") -> ExecutionPlan:
+    """Keep only influences that name a recalled memory, with the id made complete."""
+    grounded = []
+    for influence in plan.memory_influence:
+        match = memory.resolve(influence.memory_id) if memory else None
+        if match is not None:
+            grounded.append(influence.model_copy(update={"memory_id": match.id}))
+    return plan.model_copy(update={"memory_influence": grounded})
 
 
 def synthesize(request: str, plan: ExecutionPlan, results: dict[str, SpecialistResult]) -> str:
