@@ -1,0 +1,10 @@
+# USD per million tokens. A model entry wins over its provider's default.
+# Hosted prices change often: copy current figures from each provider's pricing page.
+# A model without a price is reported with an unknown cost instead of a guess.
+models: {}
+  # claude-sonnet-5-5: {input: 0.0, output: 0.0}
+
+providers:
+  ollama: {input: 0.0, output: 0.0}
+  # Made-up rates so dashboards show numbers in mock mode; reports label them simulated.
+  mock: {input: 1.0, output: 4.0, simulated: true}
