@@ -39,7 +39,20 @@ class Settings(BaseSettings):
     mcp_enabled: bool = True
     log_level: str = "INFO"
 
+    embedding_provider: Literal["hash", "ollama", "openai"] = "hash"
+    embedding_model: str = ""
+    chroma_collection: str = "aos_memories"
+    memory_top_k: int = 4
+    memory_min_similarity: float | None = None
+    memory_dedupe_similarity: float = 0.92
+    memory_consolidate_similarity: float | None = None
+    memory_half_life_days: float = 30.0
+    memory_expire_below: float = 0.05
+    memory_maintenance_minutes: int = 60
+
+    notify_webhook_url: str = ""
     plan_confidence_threshold: float = 0.6
+    plan_notify_threshold: float = 0.75
     review_approve_score: float = 0.7
     review_escalate_score: float = 0.6
     max_revisions: int = 2
