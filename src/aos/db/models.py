@@ -2,7 +2,17 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -107,4 +117,56 @@ class OutboxMessage(Base):
     recipient: Mapped[str] = mapped_column(Text)
     subject: Mapped[str] = mapped_column(Text)
     body: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Escalation(Base):
+    __tablename__ = "escalations"
+    __table_args__ = (UniqueConstraint("run_id", "step_key"),)
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(ForeignKey("runs.id", ondelete="CASCADE"), index=True)
+    task_id: Mapped[str] = mapped_column(String(36), index=True)
+    step_key: Mapped[str] = mapped_column(String(200))
+    level: Mapped[str] = mapped_column(String(32))
+    trigger: Mapped[str] = mapped_column(String(64), index=True)
+    origin: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(32), index=True, default="pending")
+    subtask_id: Mapped[str | None] = mapped_column(String(64))
+    action_id: Mapped[str | None] = mapped_column(String(64))
+    context: Mapped[dict[str, Any]]
+    proposed_action: Mapped[dict[str, Any] | None]
+    decision: Mapped[dict[str, Any] | None]
+    chat: Mapped[list[Any]] = mapped_column(default=list)
+    decided_by: Mapped[str | None] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    review_seconds: Mapped[float | None] = mapped_column(Float)
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    escalation_id: Mapped[str] = mapped_column(
+        ForeignKey("escalations.id", ondelete="CASCADE"), index=True
+    )
+    channel: Mapped[str] = mapped_column(String(32), default="console")
+    message: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class MemoryRetrieval(Base):
+    __tablename__ = "memory_retrievals"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    run_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    user_id: Mapped[str] = mapped_column(String(128), index=True)
+    memory_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(32))
+    query: Mapped[str] = mapped_column(Text)
+    score: Mapped[float] = mapped_column(Float)
+    used_in_plan: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

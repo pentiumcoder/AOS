@@ -48,7 +48,6 @@ class SpecialistTask(TypedDict):
     run_id: str
     request: str
     subtask: dict[str, Any]
-    dep_outputs: dict[str, str]
     attempt: int
     feedback: str | None
     approach_hint: str | None
