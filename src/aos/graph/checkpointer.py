@@ -4,6 +4,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.checkpoint.memory import InMemorySaver
 
 from aos.config import get_settings
+from aos.db.session import schema_lock
 
 _saver: BaseCheckpointSaver | None = None
 _pool = None
@@ -35,7 +36,8 @@ def get_checkpointer() -> BaseCheckpointSaver:
             open=True,
         )
         saver = PostgresSaver(_pool)
-        saver.setup()
+        with schema_lock():
+            saver.setup()
         _saver = saver
         return _saver
 
