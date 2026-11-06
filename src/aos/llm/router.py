@@ -240,8 +240,10 @@ def get_llm(role: str, complexity: str = "medium") -> LLMClient:
 
     session = active_session(context.get("run_id"))
     if session is not None:
-        replay = ReplayProvider(session, providers_for(role, complexity))
-        return LLMClient(role, [replay], retries=0)
+        # One stand-in per provider so a recorded fallback from one provider to the next
+        # replays as the same fallback.
+        chain = providers_for(role, complexity) or [None]
+        return LLMClient(role, [ReplayProvider(session, live) for live in chain], retries=0)
     return LLMClient(role, providers_for(role, complexity))
 
 

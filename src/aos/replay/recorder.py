@@ -104,24 +104,23 @@ class ReplaySession:
 
 
 class ReplayProvider(LLMProvider):
-    name = "replay"
+    """Stands in for one provider of the original chain, answering from the recording."""
 
-    def __init__(self, session: ReplaySession, fallback: list[LLMProvider]) -> None:
-        super().__init__("recorded")
+    # It takes the live provider's name and model because they end up in error messages,
+    # and those feed retry prompts: a different label would make the replay diverge.
+    def __init__(self, session: ReplaySession, live: LLMProvider | None) -> None:
+        super().__init__(live.model if live else "recorded")
+        self.name = live.name if live else "replay"
         self.session = session
-        self.fallback = fallback
+        self.live = live
 
     def complete(self, request: LLMRequest) -> LLMResult:
         result = self.session.answer(request)
         if result is not None:
             return result
-        failures = []
-        for provider in self.fallback:
-            try:
-                return provider.complete(request)
-            except LLMError as exc:
-                failures.append(f"{provider!r}: {exc}")
-        raise LLMError("no model available after divergence: " + "; ".join(failures))
+        if self.live is None:
+            raise LLMError("no model configured to continue after divergence")
+        return self.live.complete(request)
 
 
 _sessions: dict[str, ReplaySession] = {}
@@ -174,7 +173,7 @@ def load_session(
         tools: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for call in tool_calls:
             # Failures replay too: their error text (temp paths, timings) would differ if rerun.
-            if call.output is not None and "truncated" in call.output:
+            if _cut_when_logged(call.output):
                 continue
             key = _tool_key(call.subtask_id, call.agent, call.tool, call.input)
             tools[key].append({"success": call.success, "output": call.output, "error": call.error})
@@ -189,6 +188,12 @@ def load_session(
         decisions=decisions,
         memory_context=memory_context,
     )
+
+
+def _cut_when_logged(output: dict[str, Any] | None) -> bool:
+    # The registry logs over-long outputs as {"truncated": "<prefix>"}. db_query and
+    # file_read return a boolean truncated field of their own, which must not match.
+    return output is not None and len(output) == 1 and isinstance(output.get("truncated"), str)
 
 
 def _tool_key(subtask_id: str | None, agent: str, tool: str, args: Any) -> str:

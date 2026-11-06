@@ -2,10 +2,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm.attributes import flag_modified
 
 from aos.api.main import app
-from aos.db.models import Escalation, LLMCall, OutboxMessage, Run
+from aos.db.models import Escalation, LLMCall, OutboxMessage, Run, ToolCall
 from aos.memory.longterm import LongTermMemory
 from aos.replay.compare import compare
 from aos.replay.engine import list_steps, replay
+from aos.replay.recorder import load_session
 
 VECTOR_REQUEST = (
     "Research the top 3 open-source vector databases, compare them using our benchmark "
@@ -103,6 +104,26 @@ def test_replay_through_the_api(finish):
         assert report["replay"]["fresh_calls"] == 0
         assert client.post("/runs/nope/replay", json={}).status_code == 404
         assert client.get(f"/runs/{parent}/compare/nope").status_code == 404
+
+
+def test_malformed_answer_and_its_retry_replay_without_divergence(db, finish):
+    original, _, parent = finish("[test:malformed] release note")
+    assert "invalid SpecialistOutput" in original["approach_hints"]["s1"]
+
+    run_id, final = replay(parent)
+    summary = db.get(Run, run_id).metrics["replay"]
+    assert summary["fresh_calls"] == 0, summary["divergence"]
+    assert final["approach_hints"] == original["approach_hints"]
+
+
+def test_tool_outputs_with_their_own_truncated_field_are_replayed(db, finish):
+    _, _, parent = finish(VECTOR_REQUEST)
+    recorded = db.query(ToolCall).filter_by(run_id=parent, tool="db_query").first()
+    assert recorded.output["truncated"] is False
+
+    session = load_session("replay-run", parent, "recorded", {}, None)
+    output = session.tool_output(recorded.subtask_id, recorded.agent, "db_query", recorded.input)
+    assert output is not None
 
 
 def test_replay_matches_when_stored_json_comes_back_reordered(db, finish):
