@@ -77,17 +77,21 @@ replay = st.session_state.get("replay")
 if not replay or replay["original"] != run_id:
     st.stop()
 
+# The task reads completed a moment before the worker stores the replay summary.
 with st.spinner("Replaying"):
     for _ in range(120):
         status = api().task(replay["task_id"])["status"]
-        if status in ("completed", "failed"):
+        if status == "failed":
             break
+        if status == "completed":
+            result = api().compare(run_id, replay["run_id"])
+            if result["replay"]:
+                break
         time.sleep(1)
 if status != "completed":
     st.warning(f"Replay {words(status)}.")
     st.stop()
 
-result = api().compare(run_id, replay["run_id"])
 summary = result["replay"] or {}
 st.divider()
 st.subheader("What changed")
