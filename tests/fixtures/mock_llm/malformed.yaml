@@ -1,0 +1,22 @@
+# The first attempt answers without the required output field, twice; the retry succeeds.
+match: ["[test:malformed]"]
+
+plan:
+  - task_type: writing
+    rationale: A single short text.
+    confidence: 0.8
+    subtasks:
+      - id: s1
+        description: Write a one-line release note for the new search page
+        specialist: writing
+        expected_output: One sentence
+
+subtasks:
+  s1:
+    - steps:
+        - final: {confidence: 0.9}
+    - steps:
+        - final: {output: "Search now has its own page with filters and saved queries.", confidence: 0.9}
+
+synthesize:
+  - "{{outputs.s1}}"
