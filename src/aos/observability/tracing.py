@@ -20,8 +20,8 @@ STATUS = "aos.status"
 _propagator = TraceContextTextMapPropagator()
 _provider: TracerProvider | None = None
 _lock = threading.Lock()
-# The span of the graph invocation currently running each run. LangGraph runs nodes on
-# its own worker threads, so node spans attach here rather than to the thread's context.
+# span of the graph invocation currently running for each run. langgraph runs nodes
+# on its own threads, so node spans hang off this instead of the thread context
 _run_contexts: dict[str, Context] = {}
 
 
@@ -35,8 +35,8 @@ def provider() -> TracerProvider:
             _provider = TracerProvider(
                 resource=Resource.create({"service.name": settings.otel_service_name})
             )
-            # Batched; the runner flushes after every graph invocation, so a finished run's
-            # spans are in the table before anyone asks for its trace.
+            # batched. the runner flushes after each invocation, so spans are already in the
+            # table by the time someone opens the trace
             _provider.add_span_processor(
                 BatchSpanProcessor(PostgresSpanExporter(), schedule_delay_millis=500)
             )

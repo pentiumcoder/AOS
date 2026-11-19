@@ -106,8 +106,8 @@ class ReplaySession:
 class ReplayProvider(LLMProvider):
     """Stands in for one provider of the original chain, answering from the recording."""
 
-    # It takes the live provider's name and model because they end up in error messages,
-    # and those feed retry prompts: a different label would make the replay diverge.
+    # use the live provider's name/model: they end up in error messages that feed retry
+    # prompts, and a different label would make the replay diverge
     def __init__(self, session: ReplaySession, live: LLMProvider | None) -> None:
         super().__init__(live.model if live else "recorded")
         self.name = live.name if live else "replay"
@@ -172,7 +172,7 @@ def load_session(
             )
         tools: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for call in tool_calls:
-            # Failures replay too: their error text (temp paths, timings) would differ if rerun.
+            # replay failures too, rerunning them gives different error text (temp paths etc)
             if _cut_when_logged(call.output):
                 continue
             key = _tool_key(call.subtask_id, call.agent, call.tool, call.input)
@@ -191,8 +191,8 @@ def load_session(
 
 
 def _cut_when_logged(output: dict[str, Any] | None) -> bool:
-    # The registry logs over-long outputs as {"truncated": "<prefix>"}. db_query and
-    # file_read return a boolean truncated field of their own, which must not match.
+    # registry stores over-long outputs as {"truncated": "<prefix>"}. db_query and
+    # file_read have their own bool `truncated` field, don't match that
     return output is not None and len(output) == 1 and isinstance(output.get("truncated"), str)
 
 

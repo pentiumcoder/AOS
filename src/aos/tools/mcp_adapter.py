@@ -33,7 +33,7 @@ class McpServer:
 
 
 def tool_name(server: str, tool: str) -> str:
-    # Provider APIs only accept [A-Za-z0-9_-] in tool names.
+    # provider APIs only allow [A-Za-z0-9_-] in tool names
     return f"mcp__{server}__{tool}"
 
 
@@ -45,8 +45,8 @@ def load_servers(path: Path) -> list[McpServer]:
 
 
 def _run_sync(coro_factory: Any) -> Any:
-    # Each call gets its own event loop on a worker thread, so this is safe to call from
-    # sync graph nodes and from inside a running loop such as the API.
+    # new event loop per call on a worker thread, so this works from sync graph nodes
+    # and from inside a running loop (e.g. the API)
     with ThreadPoolExecutor(max_workers=1) as pool:
         return pool.submit(lambda: asyncio.run(coro_factory())).result()
 

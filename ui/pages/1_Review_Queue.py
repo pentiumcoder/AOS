@@ -37,7 +37,7 @@ def queue() -> str | None:
         st.success("Nothing is waiting for a decision.")
         return None
     labels = {
-        e["id"]: f"{words(e['level'])} · {words(e['trigger'])} · {age(e['created_at'])}"
+        e["id"]: f"{words(e['level'])} - {words(e['trigger'])} - {age(e['created_at'])}"
         for e in pending
     }
     ids = list(labels)

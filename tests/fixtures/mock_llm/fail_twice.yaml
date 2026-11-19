@@ -1,4 +1,4 @@
-# s1 can never be completed; s2 is independent and succeeds.
+# s1 can never complete, s2 is independent and succeeds
 match: ["[test:fail-twice]"]
 
 plan:

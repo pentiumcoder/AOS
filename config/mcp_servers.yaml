@@ -1,5 +1,4 @@
-# MCP servers started over stdio. Each tool they expose is registered as
-# mcp__<server>__<tool> and can be used by the listed agents.
+# stdio MCP servers. their tools show up as mcp__<server>__<tool> for the listed agents
 servers:
   demo:
     command: python

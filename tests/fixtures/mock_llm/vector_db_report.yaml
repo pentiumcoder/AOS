@@ -1,5 +1,5 @@
-# Showcase scenario: parallel research and analysis, a reviewer rejection of a draft that
-# misquotes a figure, and an email that needs approval.
+# main demo: research + analysis in parallel, reviewer rejects a draft with a wrong
+# figure, email needs approval
 match: [vector database, vector db]
 
 plan:
@@ -101,7 +101,7 @@ subtasks:
               data = json.loads(r'''{{tool_output}}''')
               rows = [dict(zip(data["columns"], row)) for row in data["rows"]]
               for row in rows:
-                  # queries served in a 30-day month at sustained load, in millions
+                  # millions of queries in a 30-day month at sustained load
                   monthly_millions = row["qps"] * 86400 * 30 / 1_000_000
                   row["cost_per_m"] = row["monthly_cost_usd"] / monthly_millions
               top = sorted(rows, key=lambda r: r["qps"], reverse=True)[:3]

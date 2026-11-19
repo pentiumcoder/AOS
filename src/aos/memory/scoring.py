@@ -4,8 +4,8 @@ import time
 from aos.config import get_settings
 from aos.schemas.memory import StoredMemory
 
-# Half-life multipliers relative to MEMORY_HALF_LIFE_DAYS: preferences and human decisions
-# stay relevant much longer than individual task episodes.
+# half-life multipliers on MEMORY_HALF_LIFE_DAYS. preferences and human decisions
+# stay relevant a lot longer than single task episodes
 HALF_LIFE_FACTOR = {"preference": 6.0, "human_decision": 3.0}
 SECONDS_PER_DAY = 86_400
 

@@ -8,7 +8,7 @@ class ApprovalLevel(StrEnum):
     TAKE_OVER = "TAKE_OVER"
 
 
-# For TAKE_OVER, "approve" means retrying the subtask once more with the reviewer's hint.
+# with TAKE_OVER, approve = retry the subtask once more using the reviewer's hint
 ALLOWED_DECISIONS: dict[ApprovalLevel, frozenset[str]] = {
     ApprovalLevel.NOTIFY: frozenset(),
     ApprovalLevel.APPROVE_ACTION: frozenset({"approve", "modify", "reject", "take_over"}),

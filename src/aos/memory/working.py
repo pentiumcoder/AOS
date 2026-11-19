@@ -23,7 +23,7 @@ class WorkingMemory:
     def _write(self, key: str, op: str, *args: Any) -> None:
         pipe = self._redis.pipeline()
         getattr(pipe, op)(key, *args)
-        # A run that crashes never reaches deliver, so every key expires on its own.
+        # crashed runs never get to deliver, so let the keys expire on their own
         pipe.expire(key, TTL_SECONDS)
         pipe.execute()
 

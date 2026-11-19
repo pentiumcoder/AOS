@@ -1,4 +1,4 @@
-# First plan has a dependency cycle; the re-plan fixes it.
+# first plan has a cycle, the re-plan fixes it
 match: ["[test:invalid-plan]"]
 
 plan:

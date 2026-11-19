@@ -18,7 +18,7 @@ def test_prices_come_from_model_then_provider():
     assert cost_of("anthropic", "claude-sonnet-5-5", 1_000, 1_000) is None
 
 
-def test_every_call_is_priced_and_the_run_is_summarised(db, finish):
+def test_run_costs(db, finish):
     _, _, run_id = finish(VECTOR_REQUEST)
     calls = db.query(LLMCall).filter_by(run_id=run_id).all()
     assert all(

@@ -1,4 +1,4 @@
-# Every plan has a cycle, so planning fails.
+# every plan has a cycle, so planning fails
 match: ["[test:unplannable]"]
 
 plan:

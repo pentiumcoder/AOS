@@ -1,4 +1,4 @@
-# Fallback scenario for any request that no other script matches.
+# fallback for requests no other script matches
 match: []
 
 plan:

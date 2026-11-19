@@ -55,8 +55,8 @@ class ToolResult(BaseModel):
     def as_text(self, limit: int = 6000) -> str:
         if not self.success:
             return f"ERROR: {self.error}"
-        # Sorted keys keep the text identical after a round trip through Postgres JSONB,
-        # which replay relies on when it compares prompts.
+        # sort keys so the text survives a round trip through JSONB unchanged
+        # (replay compares prompts)
         text = (
             self.output
             if isinstance(self.output, str)

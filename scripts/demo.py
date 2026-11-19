@@ -28,7 +28,7 @@ class Demo:
 
     def run(self, request: str, user: str) -> int:
         health = self.call("GET", "/health")
-        print(f"API {health['status']} · {health['llm_mode']} models · {health['storage_mode']}")
+        print(f"API {health['status']} - {health['llm_mode']} models - {health['storage_mode']}")
         accepted = self.call("POST", "/tasks", json={"request": request, "user_id": user})
         print(f"Task {accepted['task_id']}\n")
         while True:
@@ -50,7 +50,7 @@ class Demo:
         if escalation_id in self.decided:
             return
         detail = self.call("GET", f"/escalations/{escalation_id}")
-        print(f"\n  Waiting for a human: {detail['level']} · {detail['reason']}")
+        print(f"\n  Waiting for a human: {detail['level']} - {detail['reason']}")
         if detail.get("proposed_action"):
             action = detail["proposed_action"]
             print(f"  Proposed {action['tool']} with {action['args']}")
@@ -81,7 +81,7 @@ class Demo:
             f"${llm['cost_usd']:.4f}{priced}; {metrics['tools']['calls']} tool calls; "
             f"{trace['span_count']} spans; human review {metrics['human_review_seconds']}s"
         )
-        print("Review console: http://localhost:8501 · trace explorer: Trace Explorer page")
+        print("Review console: http://localhost:8501 - trace explorer: Trace Explorer page")
         return 0 if task["status"] == "completed" else 1
 
 

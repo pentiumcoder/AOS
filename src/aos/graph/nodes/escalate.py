@@ -88,8 +88,8 @@ def _handle(outcome: Outcome, state: dict[str, Any], request: dict[str, Any]) ->
         return
     update_run(state["run_id"], status="awaiting_human")
     update_task(state["task_id"], status="awaiting_human")
-    # LangGraph re-runs this node from the top on every resume and hands back answers in
-    # call order, so interrupt() must be reached for each escalation every time.
+    # NB: langgraph re-runs this node from the start on each resume and returns answers
+    # in call order, so every escalation has to hit interrupt() each time
     answer = interrupt(
         {
             "escalation_id": escalation["id"],

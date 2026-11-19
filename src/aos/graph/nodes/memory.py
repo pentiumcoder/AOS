@@ -15,7 +15,7 @@ log = get_logger(__name__)
 def retrieve_memory(state: dict[str, Any]) -> dict[str, Any]:
     replay = active_session(state["run_id"])
     if replay is not None:
-        # Memory has changed since the original run; reuse what it recalled instead.
+        # memory may have changed since the original run, reuse what it recalled back then
         message = "reused the memories recalled by the original run"
         return {
             "memory_context": replay.memory_context,
@@ -60,7 +60,7 @@ def persist_memory(state: dict[str, Any]) -> dict[str, Any]:
             stored = remember_run(state)
             tracing.annotate(memory_ids=[memory.id for memory, _ in stored])
     except Exception as exc:
-        # The deliverable is already saved; losing a memory must not fail the run.
+        # deliverable is already saved, don't fail the run over a memory write
         log.exception("memory persistence failed")
         return {"events": [event("persist_memory", "error", f"memory not saved: {exc}")]}
     merged = sum(1 for _, was_merged in stored if was_merged)

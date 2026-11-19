@@ -31,8 +31,8 @@ class HashEmbedder:
     """
 
     name = "hash"
-    # Unrelated texts score close to zero here, so a low bar still filters noise, and
-    # paraphrases of one lesson land around 0.55 to 0.75.
+    # unrelated texts score ~0 here so a low threshold still filters noise;
+    # paraphrases of the same lesson come out around 0.55-0.75
     min_similarity = 0.15
     consolidate_similarity = 0.55
 

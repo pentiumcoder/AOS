@@ -37,5 +37,5 @@ def _init_worker(**_: object) -> None:
     from aos.db.session import dispose
 
     init_db()
-    # Forked pool children must open their own connections.
+    # forked children need their own connections
     dispose()

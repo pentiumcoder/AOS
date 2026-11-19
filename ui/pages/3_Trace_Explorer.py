@@ -31,9 +31,9 @@ def label(node: dict[str, Any]) -> str:
     attributes = node["attributes"]
     title = node["name"]
     if attributes.get("aos.subtask_id"):
-        title += f" · {attributes['aos.subtask_id']}"
+        title += f" - {attributes['aos.subtask_id']}"
     if node["name"] == "llm.call":
-        title = f"{attributes.get('aos.agent')} · {attributes.get('aos.purpose')}"
+        title = f"{attributes.get('aos.agent')} - {attributes.get('aos.purpose')}"
     if node["name"] == "tool.invoke":
         title = f"{attributes.get('aos.tool')}"
     lines = [title]
@@ -44,7 +44,7 @@ def label(node: dict[str, Any]) -> str:
         lines.append(f"{words(attributes['aos.escalation.trigger'])}: {decision}")
     footer = f"{node['duration_ms']:.0f} ms"
     if attributes.get("aos.cost_usd") is not None:
-        footer += f" · ${attributes['aos.cost_usd']:.4f}"
+        footer += f" - ${attributes['aos.cost_usd']:.4f}"
     lines.append(footer)
     return "\\n".join(line.replace('"', "'") for line in lines)
 
@@ -130,7 +130,7 @@ def timeline(roots: list[dict[str, Any]]) -> alt.Chart | None:
 
 def show_span(span_id: str) -> None:
     detail = api().span(span_id)
-    st.markdown(f"**{detail['name']}** · {detail['status']} · {detail['duration_ms']:.0f} ms")
+    st.markdown(f"**{detail['name']}** - {detail['status']} - {detail['duration_ms']:.0f} ms")
     attributes = {k.removeprefix("aos."): v for k, v in detail["attributes"].items()}
     st.dataframe(
         [{"attribute": k, "value": str(v)} for k, v in sorted(attributes.items())],
@@ -141,8 +141,8 @@ def show_span(span_id: str) -> None:
         st.caption(f"{event['name']}: {json.dumps(event['attributes'])[:300]}")
     for call in detail["llm_calls"]:
         st.markdown(
-            f"Model call: `{call['provider']}:{call['model']}` · {call['input_tokens']} in / "
-            f"{call['output_tokens']} out tokens" + (" · replayed" if call["replayed"] else "")
+            f"Model call: `{call['provider']}:{call['model']}` - {call['input_tokens']} in / "
+            f"{call['output_tokens']} out tokens" + (" - replayed" if call["replayed"] else "")
         )
         with st.expander("Prompt"):
             if call["messages"].get("system"):
@@ -154,7 +154,7 @@ def show_span(span_id: str) -> None:
             st.json(call["response"])
     for call in detail["tool_calls"]:
         st.markdown(
-            f"Tool call: `{call['tool']}` by {call['agent']} · "
+            f"Tool call: `{call['tool']}` by {call['agent']} - "
             f"{'ok' if call['success'] else call['error']}"
         )
         left, right = st.columns(2)

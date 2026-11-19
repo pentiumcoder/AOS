@@ -30,7 +30,7 @@ def test_rejected_email_is_never_sent(db, finish):
     assert db.get(Run, run_id).status == "completed"
 
 
-def test_modified_email_is_sent_with_reviewer_changes(db, finish):
+def test_modified_email(db, finish):
     edit = HumanDecision(action="modify", payload={"subject": "Weekly vector DB summary"})
     _, _, run_id = finish(VECTOR_REQUEST, decide=decisions(edit))
     email = db.query(OutboxMessage).filter_by(run_id=run_id).one()
@@ -38,7 +38,7 @@ def test_modified_email_is_sent_with_reviewer_changes(db, finish):
     assert email.recipient == "team@example.com"
 
 
-def test_reviewer_edit_cannot_bypass_recipient_policy(db, finish):
+def test_reviewer_edit_checked_against_policy(db, finish):
     edit = HumanDecision(action="modify", payload={"to": ["mallory@evil.example"]})
     final, _, run_id = finish(VECTOR_REQUEST, decide=decisions(edit))
     assert final["actions"][0]["status"] == "rejected"
@@ -74,7 +74,7 @@ def test_plan_can_be_replaced_by_the_reviewer(finish):
     assert final["subtask_status"] == {"s1": "done", "s2": "done"}
 
 
-def test_rejected_plan_is_replanned_with_the_comment(db, finish):
+def test_rejected_plan_replanned(db, finish):
     answers = decisions(
         HumanDecision(action="reject", comment="Use the internal wiki instead"),
         HumanDecision(action="approve"),
@@ -91,7 +91,7 @@ def test_rejected_plan_is_replanned_with_the_comment(db, finish):
     assert final["final_output"]
 
 
-def test_take_over_level_can_retry_with_a_hint_first(finish):
+def test_take_over_retry_with_hint(finish):
     answers = decisions(
         HumanDecision(action="approve", comment="The warehouse is back up, try again"),
         HumanDecision(action="take_over", payload="Sales were 1,240 units"),
@@ -102,7 +102,7 @@ def test_take_over_level_can_retry_with_a_hint_first(finish):
     assert final["results"]["s1"]["output"] == "Sales were 1,240 units"
 
 
-def test_rejected_deliverable_goes_back_to_the_writer(db, finish):
+def test_rejected_deliverable(db, finish):
     answers = decisions(
         HumanDecision(action="reject", comment="Mention retrieval latency"),
         HumanDecision(action="approve"),

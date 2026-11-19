@@ -51,7 +51,7 @@ def db_query(args: DbQueryInput, ctx: ToolContext) -> DbQueryOutput:
             conn.exec_driver_sql("SET LOCAL search_path TO demo")
             conn.exec_driver_sql("SET LOCAL statement_timeout = 5000")
         try:
-            # The raw DBAPI cursor keeps colons and percent signs in the query literal.
+            # raw DBAPI cursor so colons and % in the query are left alone
             cursor = conn.connection.cursor()
             cursor.execute(sql)
             columns = [d[0] for d in cursor.description or []]
@@ -73,8 +73,8 @@ def db_query(args: DbQueryInput, ctx: ToolContext) -> DbQueryOutput:
 
 
 def summarize(columns: list[str], rows: list[list[Any]]) -> dict[str, dict[str, Any]]:
-    # Small models misread minimums and maximums from raw rows, so state them outright,
-    # labelled with the row's name.
+    # small models get min/max wrong when reading raw rows, so spell them out
+    # along with the row name
     if len(rows) < 2:
         return {}
     label = next(

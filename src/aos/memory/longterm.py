@@ -195,7 +195,7 @@ def _where(user_id: str, kinds: list[str] | None, include_consolidated: bool) ->
 
 
 def _metadata(memory: StoredMemory) -> dict[str, Any]:
-    # Chroma metadata accepts only scalars, so lists and None become strings.
+    # chroma metadata only takes scalars, so lists/None get stringified
     return {
         "user_id": memory.user_id,
         "kind": memory.kind,

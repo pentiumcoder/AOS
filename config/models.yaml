@@ -1,7 +1,6 @@
-# Provider chains per role, as provider:model. The first usable entry is primary and the
-# rest are fallbacks. Entries whose provider has no API key are skipped, so with no keys
-# every role runs on the local Ollama model.
-# Placeholders: {ollama_model} -> OLLAMA_MODEL, {openai_reviewer_model} -> OPENAI_REVIEWER_MODEL
+# provider:model chains per role. first usable entry wins, the rest are fallbacks.
+# providers without an API key get skipped, so with no keys everything runs on ollama.
+# {ollama_model} -> OLLAMA_MODEL, {openai_reviewer_model} -> OPENAI_REVIEWER_MODEL
 
 roles:
   supervisor:

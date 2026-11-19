@@ -21,7 +21,7 @@ def http_get(args: HttpGetInput, ctx: ToolContext) -> dict:
     if not any(host == domain or host.endswith(f".{domain}") for domain in allowed):
         raise ToolError(f"{host or 'url'} is not on the HTTP allowlist")
     try:
-        # Redirects are not followed so a response can never leave the allowlist.
+        # don't follow redirects, otherwise a response could leave the allowlist
         response = httpx.get(args.url, timeout=10, follow_redirects=False)
     except httpx.HTTPError as exc:
         raise ToolError(f"request failed: {exc}") from exc

@@ -1,4 +1,4 @@
-# The first attempt answers without the required output field, twice; the retry succeeds.
+# attempt 1 leaves out the required output field (twice), the retry works
 match: ["[test:malformed]"]
 
 plan:

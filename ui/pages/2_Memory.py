@@ -64,7 +64,7 @@ with manage:
             f"{report['consolidated_groups']} summaries; {report['remaining']} remain."
         )
     if found:
-        labels = {m["id"]: f"{m['id'][:8]} · {m['text'][:70]}" for m in found}
+        labels = {m["id"]: f"{m['id'][:8]} - {m['text'][:70]}" for m in found}
         doomed = st.selectbox("Delete one memory", list(labels), format_func=labels.get)
         if st.button("Delete memory"):
             api().delete_memory(doomed)

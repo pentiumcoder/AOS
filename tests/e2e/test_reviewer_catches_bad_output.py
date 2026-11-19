@@ -17,7 +17,7 @@ def test_misquoted_figure_is_rejected_and_fixed(api):
     assert "4,600" not in task["final_output"]
 
 
-def test_low_quality_work_escalates_after_the_last_revision(api):
+def test_low_quality_escalates(api):
     task = api.run("[test:low-score] announce the feature")
     [subtask] = task["run"]["subtasks"]
     assert [r["score"] for r in subtask["reviews"]] == [0.3, 0.3, 0.3]

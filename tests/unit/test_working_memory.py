@@ -27,7 +27,7 @@ def test_round_trip_and_clear():
     assert get_redis().keys(f"{memory.prefix}:*") == []
 
 
-def test_dependent_subtasks_read_upstream_output_from_working_memory(db, finish):
+def test_working_memory_upstream_output(db, finish):
     _, _, run_id = finish(VECTOR_REQUEST)
 
     writer_prompt = (

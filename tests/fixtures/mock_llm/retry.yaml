@@ -1,4 +1,4 @@
-# The first attempt divides by zero and reports a blocker; the retry succeeds.
+# attempt 1 divides by zero and reports a blocker, the retry works
 match: ["[test:retry]"]
 
 plan:

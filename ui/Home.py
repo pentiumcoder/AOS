@@ -9,7 +9,7 @@ st.caption("A supervisor plans, specialists work with tools, a reviewer checks, 
 with st.sidebar:
     try:
         health = api().health()
-        st.success(f"API {health['status']} · {health['llm_mode']} models")
+        st.success(f"API {health['status']} - {health['llm_mode']} models")
     except ApiError as exc:
         st.error(str(exc))
         st.stop()
@@ -68,7 +68,7 @@ def show_task(task_id: str) -> None:
     detail = api().task(task_id)
     run = detail.get("run") or {}
     st.markdown(f"### {status_badge(detail['status'])}")
-    st.caption(f"{detail['request']} · started {age(detail['created_at'])}")
+    st.caption(f"{detail['request']} - started {age(detail['created_at'])}")
 
     if run.get("pending_escalations"):
         st.warning(
@@ -79,7 +79,7 @@ def show_task(task_id: str) -> None:
         if run.get("plan"):
             plan = run["plan"]
             st.write(
-                f"**{plan['task_type']}** · confidence {plan['confidence']:.2f} · "
+                f"**{plan['task_type']}** - confidence {plan['confidence']:.2f} - "
                 f"{plan['rationale']}"
             )
             st.dataframe(subtask_rows(run), hide_index=True, width="stretch")

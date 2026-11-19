@@ -1,5 +1,5 @@
-# First run: research quotes web figures, the reviewer rejects them, and the lesson is
-# stored. A later similar run recalls the lesson and plans a benchmark query instead.
+# run 1: research quotes web numbers, reviewer rejects them, lesson gets stored.
+# a later similar run recalls it and plans a benchmark query instead
 match: ["[test:learning]"]
 
 plan:

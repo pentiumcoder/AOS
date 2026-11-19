@@ -1,4 +1,4 @@
-# Offline web search results, matched by keyword in order. Unmatched queries get generic hits.
+# offline search results, matched by keyword in order. anything else gets generic hits
 - match: [pricing, managed, cloud offering]
   results:
     - title: Zilliz Cloud - managed Milvus

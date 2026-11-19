@@ -67,7 +67,7 @@ def test_email_must_be_requested(request_text, expected):
     assert policy.requested("send_email", request_text) is expected
 
 
-def test_recipients_must_be_known_or_written_in_the_request():
+def test_recipient_allowlist():
     request = "Email the summary to the team and to ana@corp.example"
     assert policy.check_action("send_email", EMAIL, request) is None
     assert policy.check_action("send_email", {**EMAIL, "to": ["ana@corp.example"]}, request) is None
@@ -76,7 +76,7 @@ def test_recipients_must_be_known_or_written_in_the_request():
     assert "team@example.com" in problem
 
 
-def test_send_email_is_hidden_unless_plan_and_request_ask_for_it():
+def test_send_email_only_when_requested():
     writer = get_specialist("writing")
     asked = "Summarise and email it to the team"
     names = lambda subtask, request: [t.name for t in writer.offered_tools(subtask, request)]  # noqa: E731
@@ -95,7 +95,7 @@ def test_unoffered_email_call_is_refused(scripted):
     assert "send_email" not in provider.offered[0]
 
 
-def test_invented_recipient_is_refused_with_allowed_list(scripted):
+def test_unknown_recipient_refused(scripted):
     bad = {**EMAIL, "to": ["john.doe@example.com"]}
     provider = scripted(ToolCall(id="c1", name="send_email", args=bad))
     result = get_specialist("writing").run(
@@ -106,7 +106,7 @@ def test_invented_recipient_is_refused_with_allowed_list(scripted):
     assert "team@example.com" in provider.tool_replies[0]
 
 
-def test_repeated_identical_tool_call_is_not_rerun(scripted, db):
+def test_repeated_tool_call_skipped(scripted, db):
     query = {"sql": "SELECT database FROM benchmarks ORDER BY p95_latency_ms LIMIT 1"}
     scripted(
         ToolCall(id="c1", name="db_query", args=query),
@@ -152,14 +152,14 @@ def test_duplicate_proposals_are_merged():
     assert len(update["pending_escalations"]) == 1
 
 
-def test_policy_violations_are_blocked_without_escalating():
+def test_policy_blocks_without_escalation():
     state = action_state(proposal("a1", to=["mallory@evil.example"]), request="Email the team")
     update = execute_actions(state)
     assert update["actions"][0]["status"] == "rejected"
     assert update["pending_escalations"] == []
 
 
-def test_approved_action_is_rechecked_before_it_runs(db):
+def test_approved_action_rechecked(db):
     state = action_state(request="Email the team")
     edited = proposal("a1", to=["mallory@evil.example"]).model_dump()
     edited["status"] = "approved"

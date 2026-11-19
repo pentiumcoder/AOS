@@ -1,4 +1,4 @@
-# The reviewer rejects every draft with a low score.
+# reviewer rejects every draft with a low score
 match: ["[test:low-score]"]
 
 plan:

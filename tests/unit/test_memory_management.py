@@ -26,7 +26,7 @@ def add(store, kind, text, *, user="alice", idle_days=0.0, importance=0.5, dedup
     return memory
 
 
-def test_stale_memories_expire_but_preferences_stay(store):
+def test_expiry_keeps_preferences(store):
     stale = add(store, "fact", "Old benchmark figures from last year", idle_days=200)
     fresh = add(store, "fact", "Qdrant has the lowest p95 latency on our benchmark")
     old_preference = add(store, "preference", "Summaries under 200 words", idle_days=400)
@@ -38,13 +38,13 @@ def test_stale_memories_expire_but_preferences_stay(store):
     assert {fresh.id, old_preference.id} <= remaining
 
 
-def test_near_duplicates_are_consolidated_and_hidden_from_search(store):
+def test_consolidate_near_duplicates(store):
     texts = [
         "Compute benchmark figures with db_query before writing the summary",
         "Compute the benchmark figures with db_query before writing a summary",
         "Always compute benchmark figures with db_query before writing the summary",
     ]
-    # Stored without dedupe, as when similar lessons accumulate across many runs.
+    # no dedupe here, like similar lessons piling up over many runs
     members = [add(store, "approach", text, dedupe=False) for text in texts]
     add(store, "approach", "Escalate when the plan confidence is low")
 
@@ -73,7 +73,7 @@ def test_maintenance_is_idempotent(store):
     assert second.consolidated_groups == 0
 
 
-def test_forget_user_removes_memories_and_retrieval_log(db):
+def test_forget_user(db):
     request = "[test:learning] Summarise the latency of our vector databases"
     for _ in range(2):
         _, run_id = create_task(request, user_id="alice")
@@ -108,7 +108,7 @@ def test_memory_api(store):
         assert len(client.get("/users/bob/memories").json()) == 1
 
 
-def test_paraphrased_lessons_consolidate_with_the_offline_embedder(store):
+def test_consolidate_paraphrases_hash_embedder(store):
     lessons = [
         "For latency questions, query the internal benchmarks table with db_query instead "
         "of searching the web; web figures were rejected.",

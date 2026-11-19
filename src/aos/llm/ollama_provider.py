@@ -54,9 +54,9 @@ class OllamaProvider(LLMProvider):
         return self._chat(request)
 
     def _tools_then_answer(self, request: LLMRequest) -> LLMResult:
-        # Small models often stuff a final answer into a real tool call when an answer tool
-        # sits next to it. Offer only the real tools, and once the model replies in prose,
-        # ask again with the JSON schema enforced by Ollama's format option.
+        # small models like to stuff the final answer into a tool call when an answer tool
+        # sits next to the real ones. so offer only the real tools, then once the model
+        # replies in plain text ask again with the schema enforced via `format`
         first = self._chat(request.model_copy(update={"response_schema": None}))
         if first.tool_calls:
             return first

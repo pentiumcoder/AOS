@@ -30,7 +30,7 @@ def execute_actions(state: dict[str, Any]) -> dict[str, Any]:
     for raw in raw_actions:
         action = ProposedAction.model_validate(raw)
         if action.status == "approved":
-            # Checked again because a reviewer may have edited the arguments.
+            # re-check, the reviewer may have edited the args
             if problem := policy.check_action(action.tool, action.args, state["request"]):
                 action.status, action.result = "rejected", problem
             else:

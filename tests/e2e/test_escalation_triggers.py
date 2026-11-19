@@ -32,7 +32,7 @@ def test_trigger_pauses_at_the_right_level(api, request_text, fields, trigger, l
     assert finished["status"] == "completed"
 
 
-def test_borderline_confidence_notifies_without_pausing(api):
+def test_borderline_confidence_notifies(api):
     task_id = api.submit("[test:borderline] background please")
     task = api.wait(task_id)
     assert task["status"] == "completed"

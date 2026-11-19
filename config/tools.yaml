@@ -1,7 +1,7 @@
-# Which agents may call each built-in tool, with per-tool limits.
-# A built-in tool missing from this list is disabled.
-# Sensitive tools are offered only when the user's request contains one of their
-# requested_by words; a sensitive tool without that list is never offered.
+# which agents can call each built-in tool, plus per-tool limits.
+# anything not listed here is disabled.
+# sensitive tools are only offered if the request contains one of their requested_by
+# words. no requested_by list = never offered.
 tools:
   web_search:  {agents: [research], rate_limit_per_min: 30}
   http_get:    {agents: [research, data_analysis], rate_limit_per_min: 30}
@@ -12,7 +12,7 @@ tools:
   db_query:    {agents: [data_analysis], rate_limit_per_min: 60}
   send_email:  {agents: [writing], rate_limit_per_min: 10, requested_by: [email, e-mail, mail]}
 
-# Recipients send_email may use. Addresses written out in the request are allowed too.
+# who send_email can send to (addresses written in the request work too)
 email_directory:
   team: team@example.com
 

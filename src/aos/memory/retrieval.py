@@ -84,7 +84,7 @@ def retrieve_for_planning(
     for field, _ in SECTIONS:
         minimum = store.min_similarity
         if field == "preferences":
-            # Preferences apply across tasks, so a loose topical match is enough.
+            # preferences apply to any task, a loose match is fine
             minimum /= 2
         found = store.search(
             user_id, request, kinds=GROUPS[field], k=settings.memory_top_k, min_similarity=minimum

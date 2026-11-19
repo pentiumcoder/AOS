@@ -4,7 +4,7 @@ from harness import VECTOR_REQUEST
 pytestmark = pytest.mark.e2e
 
 
-def test_failed_attempt_is_retried_with_another_approach(api):
+def test_failed_attempt_retried(api):
     task = api.run("[test:retry] compute the mean")
     [subtask] = task["run"]["subtasks"]
     assert (subtask["status"], subtask["attempts"]) == ("done", 2)
@@ -12,7 +12,7 @@ def test_failed_attempt_is_retried_with_another_approach(api):
     assert any("retrying" in e["message"] for e in task["run"]["events"])
 
 
-def test_second_failure_hands_the_subtask_to_a_human(api):
+def test_second_failure_goes_to_human(api):
     def take_over(escalation):
         return {"action": "take_over", "payload": "March sales: 1,240 units", "reviewer": "e2e"}
 
@@ -28,9 +28,8 @@ def test_paused_run_resumes_after_a_restart(api):
     if not api.services:
         from aos.graph.builder import reset_graph
 
-        # In-process stand-in for a restart: the compiled graph is rebuilt from scratch and
-        # must pick the run up from its checkpoint. Against the stack, a separate worker
-        # process does the resuming anyway.
+        # fake restart: rebuild the compiled graph from scratch, it has to pick the run up
+        # from the checkpoint. (against the real stack a separate worker resumes it anyway)
         reset_graph()
     api.post(f"/escalations/{waiting['id']}/decision", {"action": "approve"})
     api.wait_until_not_paused(task_id)
@@ -39,7 +38,7 @@ def test_paused_run_resumes_after_a_restart(api):
     assert [a["status"] for a in task["run"]["actions"]] == ["executed"]
 
 
-def test_model_outage_falls_back_to_the_next_provider(api, monkeypatch):
+def test_provider_fallback(api, monkeypatch):
     if api.services:
         pytest.skip("needs to swap model providers inside the API process")
     from aos.llm import router

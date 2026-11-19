@@ -8,9 +8,8 @@ from pydantic import BaseModel, Field
 
 from aos.tools.base import ToolContext, ToolError
 
-# Not a security boundary: the child runs as the same user. It gets a scratch directory,
-# a stripped environment (no API keys) and a hard timeout. Untrusted code needs a real
-# sandbox such as gVisor or Firecracker.
+# NOT a sandbox. the child runs as the same user, it just gets a temp dir, a stripped
+# env (no API keys) and a hard timeout. use gVisor/Firecracker for untrusted code.
 PASSTHROUGH_ENV = ("PATH", "SYSTEMROOT", "TEMP", "TMP", "LANG")
 OUTPUT_LIMIT = 10_000
 

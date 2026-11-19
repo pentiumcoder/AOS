@@ -29,7 +29,7 @@ def edited(found: dict, old: str, new: str) -> dict:
     return {found["id"]: {**found["response"], "parsed": parsed}}
 
 
-def test_unchanged_replay_reproduces_the_run_for_free(db, finish):
+def test_unchanged_replay(db, finish):
     original, _, parent = finish(VECTOR_REQUEST, user_id="ana")
     memories_before = len(LongTermMemory().list_user("ana"))
 
@@ -47,7 +47,7 @@ def test_unchanged_replay_reproduces_the_run_for_free(db, finish):
     assert db.get(Run, run_id).parent_run_id == parent
 
 
-def test_injected_figure_is_caught_and_the_run_reconverges(db, finish):
+def test_replay_injected_figure(db, finish):
     original, _, parent = finish(VECTOR_REQUEST)
     analysis = step(parent, "data_analysis", "s2")
 
@@ -64,7 +64,7 @@ def test_injected_figure_is_caught_and_the_run_reconverges(db, finish):
     assert writer and all(call.replayed for call in writer)
 
 
-def test_edited_deliverable_changes_only_what_follows(finish):
+def test_replay_edited_deliverable(finish):
     original, _, parent = finish(VECTOR_REQUEST)
     writer = step(parent, "writing", "s4")
     change = edited(writer, "Qdrant for latency-sensitive", "Qdrant for every latency-sensitive")
@@ -106,7 +106,7 @@ def test_replay_through_the_api(finish):
         assert client.get(f"/runs/{parent}/compare/nope").status_code == 404
 
 
-def test_malformed_answer_and_its_retry_replay_without_divergence(db, finish):
+def test_replay_malformed_answer_and_retry(db, finish):
     original, _, parent = finish("[test:malformed] release note")
     assert "invalid SpecialistOutput" in original["approach_hints"]["s1"]
 
@@ -116,7 +116,7 @@ def test_malformed_answer_and_its_retry_replay_without_divergence(db, finish):
     assert final["approach_hints"] == original["approach_hints"]
 
 
-def test_tool_outputs_with_their_own_truncated_field_are_replayed(db, finish):
+def test_replay_tool_output_with_truncated_field(db, finish):
     _, _, parent = finish(VECTOR_REQUEST)
     recorded = db.query(ToolCall).filter_by(run_id=parent, tool="db_query").first()
     assert recorded.output["truncated"] is False
@@ -126,7 +126,7 @@ def test_tool_outputs_with_their_own_truncated_field_are_replayed(db, finish):
     assert output is not None
 
 
-def test_replay_matches_when_stored_json_comes_back_reordered(db, finish):
+def test_replay_with_reordered_json(db, finish):
     """Postgres JSONB does not keep key order; replays must not depend on it."""
 
     def reorder(value):
@@ -139,7 +139,7 @@ def test_replay_matches_when_stored_json_comes_back_reordered(db, finish):
     _, _, parent = finish(VECTOR_REQUEST)
     for call in db.query(LLMCall).filter_by(run_id=parent):
         call.response = reorder(call.response)
-        # Reordered dicts compare equal, so the change has to be flagged to be written.
+        # reordered dicts compare equal, so flag it or it won't get written
         flag_modified(call, "response")
     db.commit()
 

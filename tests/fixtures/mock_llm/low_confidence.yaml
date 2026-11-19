@@ -1,4 +1,4 @@
-# The planner is unsure the request can be met.
+# planner isn't sure the request can be done
 match: ["[test:low-confidence]"]
 
 plan:

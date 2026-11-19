@@ -16,7 +16,7 @@ SPECIALISTS = {"research", "data_analysis", "writing", "code"}
         "[test:low-score] announce the feature",
     ],
 )
-def test_requests_become_valid_dependency_graphs(api, request_text):
+def test_valid_dependency_graphs(api, request_text):
     task = api.run(request_text)
     plan = task["run"]["plan"]
     ids = [s["id"] for s in plan["subtasks"]]

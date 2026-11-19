@@ -53,7 +53,7 @@ def schema_request(**overrides) -> LLMRequest:
     return LLMRequest(**{**fields, **overrides})
 
 
-def test_sends_context_size_and_temperature_to_native_api():
+def test_native_api_options():
     provider, bodies = provider_with(reply('{"value": 3}'))
     result = provider.complete(schema_request(tools=[]))
     assert result.parsed == {"value": 3}
@@ -73,7 +73,7 @@ def test_tool_phase_offers_only_real_tools():
     assert "format" not in bodies[0]
 
 
-def test_prose_reply_is_followed_by_schema_enforced_answer():
+def test_prose_then_schema_call():
     provider, bodies = provider_with(reply("Qdrant is fastest."), reply('{"value": 7}'))
     result = provider.complete(schema_request())
     assert result.parsed == {"value": 7}

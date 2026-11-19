@@ -1,4 +1,4 @@
-# One image for the API, Celery worker, Celery beat and the Streamlit console.
+# single image for the api, worker, beat and the streamlit UI
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \

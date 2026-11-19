@@ -31,7 +31,7 @@ def test_paused_and_resumed_run_is_one_trace(db, finish):
     assert decided[0].attributes["aos.escalation.decision"] == "approve"
 
 
-def test_every_model_and_tool_call_links_to_a_nested_span(db, finish):
+def test_calls_link_to_spans(db, finish):
     _, _, run_id = finish(VECTOR_REQUEST)
     spans = {s.span_id: s for s in db.query(Span).all()}
 
@@ -47,7 +47,7 @@ def test_every_model_and_tool_call_links_to_a_nested_span(db, finish):
         assert spans[span.parent_span_id].name in ("node.run_specialist", "node.execute_actions")
 
 
-def test_node_spans_carry_the_decision_and_a_status(db, finish):
+def test_node_span_attributes(db, finish):
     _, _, run_id = finish(VECTOR_REQUEST)
     reviews = (
         db.query(Span).filter_by(run_id=run_id, name="node.review").order_by(Span.start_time).all()

@@ -52,7 +52,7 @@ picked = st.selectbox(
     "Step to edit",
     range(len(steps)),
     format_func=lambda i: (
-        f"#{i} {steps[i]['agent']} · {steps[i]['purpose']} {steps[i]['subtask_id'] or ''}"
+        f"#{i} {steps[i]['agent']} - {steps[i]['purpose']} {steps[i]['subtask_id'] or ''}"
     ),
 )
 step = steps[picked]
@@ -77,7 +77,7 @@ replay = st.session_state.get("replay")
 if not replay or replay["original"] != run_id:
     st.stop()
 
-# The task reads completed a moment before the worker stores the replay summary.
+# status flips to completed slightly before the worker writes the replay summary
 with st.spinner("Replaying"):
     for _ in range(120):
         status = api().task(replay["task_id"])["status"]
@@ -102,7 +102,7 @@ c.metric("Final output", "same" if result["final_output"]["same"] else "changed"
 divergence = summary.get("divergence")
 if divergence:
     st.info(
-        f"First divergence: {divergence['agent']} · {divergence['purpose']} "
+        f"First divergence: {divergence['agent']} - {divergence['purpose']} "
         f"{divergence.get('subtask_id') or ''} ({divergence['reason']})"
     )
 elif not summary.get("overridden_calls"):
@@ -116,9 +116,9 @@ st.dataframe(
     [
         {
             "subtask": row["id"],
-            "status": " → ".join(str(s) for s in row["status"]),
-            "attempts": " → ".join(str(v) for v in row["visits"]),
-            "review scores": f"{row['scores'][0]} → {row['scores'][1]}",
+            "status": " -> ".join(str(s) for s in row["status"]),
+            "attempts": " -> ".join(str(v) for v in row["visits"]),
+            "review scores": f"{row['scores'][0]} -> {row['scores'][1]}",
             "output": "same" if row["same_output"] else "changed",
         }
         for row in result["subtasks"]

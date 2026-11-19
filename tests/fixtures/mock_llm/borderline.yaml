@@ -1,5 +1,4 @@
-# Confidence between the approval and notification thresholds: the reviewer is informed
-# but the run does not stop.
+# confidence between the approval and notify thresholds: reviewer gets notified, run keeps going
 match: ["[test:borderline]"]
 
 plan:

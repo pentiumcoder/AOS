@@ -69,7 +69,7 @@ class Client:
         accepted = self.call(
             "POST", f"/runs/{run_id}/replay", json={"mode": "recorded", "overrides": {}}
         )
-        # The task reads completed a moment before the worker stores the replay summary.
+        # status flips to completed slightly before the worker writes the replay summary
         while True:
             status = self.call("GET", f"/tasks/{accepted['task_id']}")["status"]
             report = self.call("GET", f"/runs/{run_id}/compare/{accepted['run_id']}")
@@ -147,7 +147,7 @@ def main() -> int:
 
     client = Client(args.api, args.user)
     health = client.call("GET", "/health")
-    print(f"API {health['status']} · {health['llm_mode']} models · {health['storage_mode']}")
+    print(f"API {health['status']} - {health['llm_mode']} models - {health['storage_mode']}")
 
     results = sequential(client, args.request, args.runs)
     if "concurrent" not in args.skip:

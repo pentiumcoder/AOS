@@ -48,7 +48,7 @@ def test_generic_request_completes():
     assert final["actions"] == []
 
 
-def test_failed_subtask_is_retried_with_alternative_approach():
+def test_failed_subtask_retry():
     final, _, _ = run("[test:retry] compute the mean")
     assert final["subtask_status"] == {"s1": "done"}
     assert final["visits"]["s1"] == 2
@@ -57,7 +57,7 @@ def test_failed_subtask_is_retried_with_alternative_approach():
     assert final["final_output"].strip() == "The mean is 5.0"
 
 
-def test_second_failure_escalates_for_a_human_to_take_over(finish):
+def test_second_failure_take_over(finish):
     from aos.schemas.escalation import HumanDecision
 
     def take_over(escalation):
@@ -72,7 +72,7 @@ def test_second_failure_escalates_for_a_human_to_take_over(finish):
     assert "March sales: 1,240 units" in final["final_output"]
 
 
-def test_low_plan_confidence_escalates_before_work_starts(finish):
+def test_low_plan_confidence(finish):
     final, _, _ = finish("[test:low-confidence] do the thing")
     assert [(e["trigger"], e["level"]) for e in final["escalations"]] == [
         ("low_plan_confidence", "APPROVE_PLAN")
@@ -81,7 +81,7 @@ def test_low_plan_confidence_escalates_before_work_starts(finish):
     assert order.index("escalate") < order.index("schedule")
 
 
-def test_low_review_score_after_max_revisions_escalates(finish):
+def test_low_score_escalates(finish):
     final, _, _ = finish("[test:low-score] announce the feature")
     assert final["visits"]["s1"] == 3
     assert final["revisions"]["s1"] == 2
@@ -89,7 +89,7 @@ def test_low_review_score_after_max_revisions_escalates(finish):
     assert final["subtask_status"]["s1"] == "done"
 
 
-def test_requested_human_review_escalates_the_deliverable(finish):
+def test_requested_review_escalates(finish):
     final, _, _ = finish("What is a vector index?", require_human_review=True)
     assert [(e["trigger"], e["origin"]) for e in final["escalations"]] == [
         ("user_requested_review", "synthesize")

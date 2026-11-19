@@ -1,6 +1,6 @@
-# The approval level each escalation trigger raises. Set enabled: false to switch one off.
-# Thresholds are settings: PLAN_CONFIDENCE_THRESHOLD, PLAN_NOTIFY_THRESHOLD,
-# REVIEW_ESCALATE_SCORE and MAX_ATTEMPTS.
+# level each escalation trigger raises; `enabled: false` turns one off
+# thresholds live in settings (PLAN_CONFIDENCE_THRESHOLD, PLAN_NOTIFY_THRESHOLD,
+# REVIEW_ESCALATE_SCORE, MAX_ATTEMPTS)
 triggers:
   low_plan_confidence:         {level: APPROVE_PLAN}
   borderline_plan_confidence:  {level: NOTIFY}

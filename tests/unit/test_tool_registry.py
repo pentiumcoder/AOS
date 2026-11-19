@@ -45,7 +45,7 @@ def test_rate_limit_trips_after_quota():
     assert "rate limit of 2/min" in registry.invoke("code", "ping", {}).error
 
 
-def test_handler_errors_and_timeouts_are_returned_not_raised():
+def test_handler_errors_and_timeouts():
     def broken(args, ctx):
         raise RuntimeError("disk on fire")
 

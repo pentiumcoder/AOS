@@ -19,7 +19,7 @@ def run(request: str, user: str = "alice") -> tuple[dict, str]:
     return run_to_completion(run_id, approve), run_id
 
 
-def test_hash_embedder_is_deterministic_and_normalised():
+def test_hash_embedder():
     first, again, other = HashEmbedder().embed(
         ["vector database benchmark", "vector database benchmark", "quarterly sales report"]
     )
@@ -29,7 +29,7 @@ def test_hash_embedder_is_deterministic_and_normalised():
     assert similarity < 0.2
 
 
-def test_completed_run_stores_episode_and_lessons():
+def test_run_stores_episode_and_lessons():
     final, run_id = run(VECTOR_REQUEST)
     memories = LongTermMemory().list_user("alice")
 
@@ -51,7 +51,7 @@ def test_completed_run_stores_episode_and_lessons():
     assert "saved 5 new" in final["events"][-1]["message"]
 
 
-def test_repeating_a_task_strengthens_instead_of_duplicating():
+def test_repeat_task_no_duplicates():
     run(VECTOR_REQUEST)
     first = {m.text: m.importance for m in LongTermMemory().list_user("alice")}
     final, _ = run(VECTOR_REQUEST)

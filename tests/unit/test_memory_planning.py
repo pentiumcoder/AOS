@@ -16,7 +16,7 @@ def run(request: str) -> tuple[dict, str]:
     return execute_run(run_id), run_id
 
 
-def test_second_similar_task_plans_from_the_stored_lesson(db):
+def test_plan_uses_stored_lesson(db):
     first, _ = run(FIRST)
     assert first["plan"]["subtasks"][0]["specialist"] == "research"
     assert first["revisions"] == {"s2": 1}
@@ -39,7 +39,7 @@ def test_second_similar_task_plans_from_the_stored_lesson(db):
     assert [row.memory_id for row in used] == [lesson.id]
 
 
-def test_planner_cannot_cite_memories_it_was_not_given():
+def test_memory_citations_grounded():
     from aos.agents.supervisor import _ground_influence
     from aos.schemas import ExecutionPlan
 
@@ -58,7 +58,7 @@ def test_planner_cannot_cite_memories_it_was_not_given():
     assert [i.memory_id for i in grounded.memory_influence] == ["abcdef1234567890"]
 
 
-def test_retrieval_separates_lessons_and_skips_other_users():
+def test_retrieval_by_kind_and_user():
     store = LongTermMemory()
     store.add(
         "alice",
@@ -84,7 +84,7 @@ def stored(kind: str, text: str, *, memory_id: str = "m" * 16, **fields) -> Stor
     )
 
 
-def test_importance_grows_with_use_and_decays_with_idle_time():
+def test_importance_and_decay():
     now = time.time()
     fresh = stored("fact", "some fact", importance=0.5)
     used = stored("fact", "some fact", importance=0.5, access_count=9)

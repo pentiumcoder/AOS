@@ -101,8 +101,8 @@ class SpecialistAgent:
                     for call in result.tool_calls:
                         content = self._execute(call, result.text, state)
                         messages.append(Message.tool(call.id, call.name, content))
-                    # A queued action is final for this attempt; withdrawing the tool stops
-                    # models from queueing it again instead of answering.
+                    # once an action is queued, pull the tool so the model answers instead of
+                    # queueing it again
                     queued = {action.tool for action in state.proposed}
                     tools = [tool for tool in tools if tool.name not in queued]
             except LLMError as exc:
@@ -118,7 +118,7 @@ class SpecialistAgent:
         approach_hint: str | None,
         state: Attempt | None = None,
     ) -> str:
-        # Sorted so the prompt is identical whatever key order a stored plan comes back in.
+        # sorted: stored plans can come back with their keys in any order
         inputs = "\n".join(f"- {key}: {value}" for key, value in sorted(subtask.inputs.items()))
         upstream = "\n\n".join(f"### {sid}\n{output}" for sid, output in dep_outputs.items())
         contacts = (

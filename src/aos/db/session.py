@@ -57,10 +57,10 @@ def schema_lock() -> Iterator[None]:
     if is_sqlite():
         yield
         return
-    # The api and worker start together; on an empty database their concurrent
-    # CREATE TABLEs collide on pg_type and Postgres fails the loser instead of waiting.
-    # Autocommit, because the checkpointer's CREATE INDEX CONCURRENTLY waits for every
-    # open transaction, including one holding this lock.
+    # api and worker both create the schema on startup. on an empty db the concurrent
+    # CREATE TABLEs clash on pg_type and postgres errors out instead of waiting.
+    # needs autocommit, otherwise the checkpointer's CREATE INDEX CONCURRENTLY
+    # blocks on our own open transaction.
     with get_engine().execution_options(isolation_level="AUTOCOMMIT").connect() as conn:
         conn.execute(text("SELECT pg_advisory_lock(:key)"), {"key": SCHEMA_LOCK_KEY})
         try:

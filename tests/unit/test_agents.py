@@ -15,7 +15,7 @@ def vector_plan():
     return plan(VECTOR_REQUEST)
 
 
-def test_supervisor_decomposes_into_dependency_graph(vector_plan):
+def test_supervisor_plan(vector_plan):
     assert validate_plan(vector_plan) == []
     assert [s.specialist for s in vector_plan.subtasks] == [
         "research",
@@ -26,19 +26,19 @@ def test_supervisor_decomposes_into_dependency_graph(vector_plan):
     assert vector_plan.subtask("s4").depends_on == ["s1", "s2", "s3"]
 
 
-def test_supervisor_replans_once_when_plan_is_invalid(db):
+def test_supervisor_replans_once(db):
     result = plan("[test:invalid-plan] summarise something")
     assert validate_plan(result) == []
     assert db.query(LLMCall).filter_by(purpose="plan").count() == 2
 
 
-def test_supervisor_gives_up_after_second_invalid_plan():
+def test_supervisor_gives_up():
     with pytest.raises(PlanningError) as caught:
         plan("[test:unplannable] anything")
     assert caught.value.errors == ["plan has cycle: s1 -> s2 -> s1"]
 
 
-def test_research_specialist_cites_search_results(vector_plan):
+def test_research_specialist(vector_plan):
     result = get_specialist("research").run(
         vector_plan.subtask("s1"), request=VECTOR_REQUEST, dep_outputs={}
     )
@@ -47,7 +47,7 @@ def test_research_specialist_cites_search_results(vector_plan):
     assert "https://milvus.io" in result.output
 
 
-def test_analysis_specialist_computes_from_database(vector_plan):
+def test_analysis_specialist(vector_plan):
     result = get_specialist("data_analysis").run(
         vector_plan.subtask("s2"), request=VECTOR_REQUEST, dep_outputs={}
     )
@@ -57,7 +57,7 @@ def test_analysis_specialist_computes_from_database(vector_plan):
     assert "Lowest cost per 1M queries: Qdrant ($0.125)" in result.output
 
 
-def test_writing_specialist_proposes_email_instead_of_sending(db, vector_plan):
+def test_writer_proposes_email(db, vector_plan):
     result = get_specialist("writing").run(
         vector_plan.subtask("s4"), request=VECTOR_REQUEST, dep_outputs={}
     )
@@ -76,7 +76,7 @@ def test_specialist_reports_blocker_as_failure():
     assert "ZeroDivisionError" in result.error
 
 
-def test_reviewer_rejects_misquoted_figure_then_approves_revision(vector_plan):
+def test_reviewer_rejects_then_approves(vector_plan):
     analysis = get_specialist("data_analysis").run(
         vector_plan.subtask("s2"), request=VECTOR_REQUEST, dep_outputs={}
     )
@@ -96,7 +96,7 @@ def test_reviewer_rejects_misquoted_figure_then_approves_revision(vector_plan):
     assert second.approved
 
 
-def test_reviewer_overrides_approval_of_invented_figures(vector_plan):
+def test_reviewer_overrides_invented_figures(vector_plan):
     from aos.schemas import SpecialistResult
 
     subtask = vector_plan.subtask("s1")
@@ -113,7 +113,7 @@ def test_reviewer_overrides_approval_of_invented_figures(vector_plan):
     assert verdict.issues[0].endswith("9,999")
 
 
-def test_queued_action_is_withdrawn_so_the_agent_must_answer(monkeypatch, vector_plan):
+def test_queued_tool_withdrawn(monkeypatch, vector_plan):
     from aos.agents.specialists import base
     from aos.llm.base import LLMProvider, LLMResult, ToolCall
     from aos.llm.router import LLMClient

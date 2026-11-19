@@ -10,7 +10,7 @@ def attempts(task):
     return sum(s["attempts"] for s in task["run"]["subtasks"])
 
 
-def test_second_similar_task_learns_from_the_first(api):
+def test_learns_from_first_task(api):
     first = api.run(FIRST)
     second = api.run(SECOND)
 

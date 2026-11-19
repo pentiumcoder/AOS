@@ -42,14 +42,14 @@ def test_mock_returns_validated_plan():
     assert result.usage.input_tokens > 0
 
 
-def test_invalid_structured_output_gets_one_repair_round():
+def test_structured_output_repair():
     provider = Scripted({"value": "not a number"}, {"value": 7})
     result = LLMClient("supervisor", [provider]).complete([Message.user("x")], schema=Answer)
     assert result.parsed == Answer(value=7)
     assert provider.calls == 2
 
 
-def test_repair_failure_falls_back_to_next_provider():
+def test_repair_failure_fallback():
     broken = Scripted({"wrong": True})
     result = LLMClient("supervisor", [broken, Scripted({"value": 3})]).complete(
         [Message.user("x")], schema=Answer
@@ -58,14 +58,14 @@ def test_repair_failure_falls_back_to_next_provider():
     assert broken.calls == 2
 
 
-def test_transient_errors_are_retried_before_fallback():
+def test_transient_retry_then_fallback():
     flaky = Scripted(TransientLLMError("503"), TransientLLMError("503"), {"value": 1})
     client = LLMClient("supervisor", [flaky], retries=2, backoff_s=0)
     assert client.complete([Message.user("x")], schema=Answer).parsed.value == 1
     assert flaky.calls == 3
 
 
-def test_permanent_error_skips_retries_and_falls_back():
+def test_permanent_error_fallback():
     denied = Scripted(LLMError("401 invalid key"))
     client = LLMClient("supervisor", [denied, MockProvider()], backoff_s=0)
     result = client.complete([Message.user("x")], meta={"purpose": "default"})
@@ -73,7 +73,7 @@ def test_permanent_error_skips_retries_and_falls_back():
     assert denied.calls == 1
 
 
-def test_all_providers_failing_raises_unavailable():
+def test_all_providers_fail():
     client = LLMClient("reviewer", [Scripted(LLMError("down"))], backoff_s=0)
     with pytest.raises(LLMUnavailable, match="all providers failed for reviewer"):
         client.complete([Message.user("x")])
@@ -96,7 +96,7 @@ def test_calls_are_persisted_with_run_context(db):
     assert len(row.prompt_hash) == 64
 
 
-def test_live_mode_without_keys_uses_local_ollama(monkeypatch):
+def test_live_mode_no_keys_ollama(monkeypatch):
     monkeypatch.setenv("LLM_MODE", "live")
     monkeypatch.setenv("OLLAMA_MODEL", "llama3.1:8b")
     get_settings.cache_clear()
@@ -105,7 +105,7 @@ def test_live_mode_without_keys_uses_local_ollama(monkeypatch):
     assert [repr(p) for p in providers_for("reviewer")] == ["ollama:llama3.1:8b"]
 
 
-def test_live_mode_prefers_hosted_models_when_keys_exist(monkeypatch):
+def test_live_mode_hosted_first(monkeypatch):
     monkeypatch.setenv("LLM_MODE", "live")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
     get_settings.cache_clear()

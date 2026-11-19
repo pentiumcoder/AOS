@@ -58,8 +58,8 @@ def isolated_env(tmp_path, monkeypatch):
     monkeypatch.setenv("WORKSPACE_DIR", str(tmp_path / "workspace"))
     monkeypatch.setenv("MCP_ENABLED", "false")
     monkeypatch.setenv("LOG_LEVEL", "WARNING")
-    # The in-memory Chroma client is shared by the whole process, so each test gets its
-    # own collection instead of a new client.
+    # in-memory chroma client is process-wide, so each test gets its own collection
+    # rather than a new client
     collection = f"test_{uuid.uuid4().hex[:12]}"
     monkeypatch.setenv("CHROMA_COLLECTION", collection)
     reset_state()

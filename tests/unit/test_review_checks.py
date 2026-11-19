@@ -13,13 +13,13 @@ def test_summary_names_lowest_and_highest_rows():
     assert summarize(["database", "qps"], [["Milvus", 4200]]) == {}
 
 
-def test_supported_figures_allow_commas_rounding_and_percentages():
+def test_figure_check_commas_rounding_percent():
     sources = ['{"rows": [["Milvus", 4200, 0.962, 0.13319]]}']
     text = "Milvus serves 4,200 QPS at 96.2% recall for $0.13 per million queries (s1, p95)."
     assert unsupported_figures(text, sources) == []
 
 
-def test_invented_figures_are_flagged_and_small_counts_ignored():
+def test_flags_invented_figures():
     sources = ["Qdrant 14.9 ms, pgvector $760.00"]
     text = "- Qdrant: 14.9 ms\n- pgvector: $620.00\n- 3 options, top 2 compared in 2026."
     assert unsupported_figures(text, sources) == ["620.00", "2026"]

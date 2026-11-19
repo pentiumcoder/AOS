@@ -55,7 +55,7 @@ def review(
     approved = verdict.approved and verdict.score >= settings.review_approve_score
     score, issues = verdict.score, list(verdict.issues)
     if unsupported:
-        # Invented figures are never approved, whatever the model concluded.
+        # made-up numbers always fail, regardless of the model's verdict
         approved = False
         score = min(score, UNSUPPORTED_SCORE_CAP)
         issues.insert(0, f"Figures not found in any tool result or input: {', '.join(unsupported)}")

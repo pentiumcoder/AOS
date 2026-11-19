@@ -30,14 +30,14 @@ def test_cycle_is_reported_with_path():
     assert {"s1", "s2", "s3"} <= set(errors[0].replace("plan has cycle: ", "").split(" -> "))
 
 
-def test_unknown_specialist_and_missing_dependency():
+def test_unknown_specialist_or_dependency():
     plan = make_plan(step("s1", "astrologer"), step("s2", deps=["s9"]))
     errors = validate_plan(plan)
     assert "s1 uses unknown specialist astrologer" in errors
     assert "s2 depends on unknown subtask s9" in errors
 
 
-def test_duplicate_ids_self_dependency_and_size_limit():
+def test_duplicate_ids_self_dep_size_limit():
     assert validate_plan(make_plan(step("s1"), step("s1"))) == ["duplicate subtask ids: s1"]
     assert validate_plan(make_plan(step("s1", deps=["s1"]))) == ["s1 depends on itself"]
     too_many = make_plan(*(step(f"s{i}") for i in range(13)))
@@ -53,7 +53,7 @@ def test_ready_subtasks_waits_for_dependencies():
     assert [s.id for s in ready_subtasks(plan, status)] == ["s3"]
 
 
-def test_dependencies_named_in_description_or_inputs_are_added():
+def test_infer_named_dependencies():
     from aos.schemas.plan import infer_dependencies
 
     s3 = step("s3", "data_analysis")
@@ -66,7 +66,7 @@ def test_dependencies_named_in_description_or_inputs_are_added():
     assert plan.subtask("s1").depends_on == []
 
 
-def test_writing_without_dependencies_waits_for_the_findings():
+def test_writer_waits_for_findings():
     from aos.schemas.plan import infer_dependencies
 
     writer = step("s3", "writing")
