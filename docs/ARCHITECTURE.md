@@ -1,6 +1,6 @@
 # Architecture
 
-This covers how a request moves through the system and why each piece is shaped the way it is.
+How a request moves through AOS, and the reasons behind the main design choices.
 
 ## Processes
 
@@ -21,7 +21,7 @@ flowchart LR
     Runner -. OTLP .-> Jaeger
 ```
 
-The API never runs a graph itself unless `TASK_EXECUTION=inline`. Submitting a task, resuming after a human decision and replaying a run are all Celery tasks, so any worker can pick up any run; the Postgres checkpointer holds everything a worker needs. `STORAGE_MODE=memory` replaces Postgres, Redis and the Chroma server with SQLite, fakeredis, an in-memory checkpointer and an in-process Chroma, which is what the tests use.
+The API doesn't run graphs itself unless `TASK_EXECUTION=inline`. New tasks, resumes after a human decision and replays are all Celery tasks, and the Postgres checkpointer holds everything a worker needs, so any worker can pick up any run. The tests use `STORAGE_MODE=memory`, which swaps Postgres, Redis and the Chroma server for SQLite, fakeredis, an in-memory checkpointer and an in-process Chroma.
 
 ## The graph
 
@@ -45,19 +45,19 @@ flowchart TD
     deliver --> persist_memory --> END([end])
 ```
 
-One node per file in `src/aos/graph/nodes/`. Each is wrapped by `traced_node`, which opens a `node.<name>` span and summarises the node's events into the span's decision and status.
+Each node lives in its own file under `src/aos/graph/nodes/` and is wrapped by `traced_node`, which opens a `node.<name>` span and records the node's decision and status on it.
 
-- **intake** records the run and creates its working-memory namespace.
-- **retrieve_memory** searches long-term memory for the user and request and puts a `PlanningContext` in state.
-- **plan** asks the supervisor for an `ExecutionPlan`, then validates it: unique ids, known specialists, no unknown or self dependencies, no cycles. `infer_dependencies` adds edges the model named in a description or input but forgot to declare, and makes a writing subtask with no dependencies wait for every non-writing one. An invalid plan is sent back to the supervisor once with the errors listed; if it is still invalid the run ends with the errors.
-- **schedule** marks every subtask whose dependencies are done as `running`; `routing.dispatch` sends one `run_specialist` branch per ready subtask with `Send`, so independent subtasks run in parallel and the reducers on `results`, `subtask_status` and the counters merge their updates.
-- **run_specialist** runs one specialist's tool loop for one subtask and returns a `SpecialistResult`.
-- **review** reviews every result from that superstep in parallel. A rejection sends the subtask back with the reviewer's feedback, up to `MAX_REVISIONS` (2); a failed attempt is retried with a hint to try a different tool or approach. A subtask that fails `MAX_ATTEMPTS` (2) times, or still scores below `REVIEW_ESCALATE_SCORE` after its last revision, goes to the escalation policy; one scoring above it is accepted with a warning.
-- **synthesize** merges the approved outputs into the deliverable and collects proposed actions.
-- **execute_actions** runs approved actions and re-checks the action policy before each one.
-- **escalate** turns pending escalation requests into queue rows and `interrupt()`s.
-- **deliver** writes the final status and output.
-- **persist_memory** extracts and stores memories from the finished run.
+- `intake` records the run and creates its working-memory namespace.
+- `retrieve_memory` searches long-term memory for the user and request and puts a `PlanningContext` in state.
+- `plan` asks the supervisor for an `ExecutionPlan`, then validates it: unique ids, known specialists, no unknown or self dependencies, no cycles. `infer_dependencies` adds edges the model named in a description or input but forgot to declare, and makes a writing subtask with no dependencies wait for every non-writing one. An invalid plan is sent back to the supervisor once with the errors listed; if it is still invalid the run ends with the errors.
+- `schedule` marks every subtask whose dependencies are done as `running`; `routing.dispatch` sends one `run_specialist` branch per ready subtask with `Send`, so independent subtasks run in parallel and the reducers on `results`, `subtask_status` and the counters merge their updates.
+- `run_specialist` runs one specialist's tool loop for one subtask and returns a `SpecialistResult`.
+- `review` checks every result from that superstep in parallel. A rejection sends the subtask back with the reviewer's feedback, up to `MAX_REVISIONS` (2); a failed attempt is retried with a hint to try a different tool or approach. A subtask that fails `MAX_ATTEMPTS` (2) times, or still scores below `REVIEW_ESCALATE_SCORE` after its last revision, goes to the escalation policy; one scoring above it is accepted with a warning.
+- `synthesize` merges the approved outputs into the deliverable and collects proposed actions.
+- `execute_actions` runs approved actions and re-checks the action policy before each one.
+- `escalate` turns pending escalation requests into queue rows and `interrupt()`s.
+- `deliver` writes the final status and output.
+- `persist_memory` extracts and stores memories from the finished run.
 
 ### State
 
@@ -78,14 +78,15 @@ Every specialist can also read and write files in the run's workspace.
 
 A specialist's loop alternates model calls and tool calls for at most `SPECIALIST_MAX_STEPS` steps. Every successful tool result is kept as evidence (the last six, 1,500 characters each) and travels with the result to the reviewer. A repeated identical call returns a reminder instead of running again.
 
-Structured output works the same across providers: Anthropic and OpenAI get a forced `respond` tool whose schema is the Pydantic model; Ollama gets a tools phase and then a call with the JSON schema as its `format`, because small local models put answers inside tool arguments when both are offered at once.
+Anthropic and OpenAI return structured output through a forced `respond` tool whose schema is the Pydantic model. Ollama gets a tools phase first and then a separate call with the JSON schema as its `format`, because small local models tend to put their answer inside tool arguments when both are offered at once.
 
-### Guards that do not trust the model
+### Checks enforced in code
 
-- **Figure check.** `reviewer.unsupported_figures` extracts every number of two or more digits from the work and looks for it, allowing rounding and percentage forms, in the request, the subtask inputs, upstream outputs and the evidence. Any miss caps the score at 0.45 and rejects the work, whatever the model's verdict.
-- **Sensitive tools.** A sensitive tool is offered only when the plan lists it in the subtask's `actions` and the request itself asks for it (`tools/policy.py`). Calling it queues a `ProposedAction` instead of running it, and the tool is then withdrawn for the rest of the attempt.
-- **Recipients.** `send_email` may only go to addresses in the request or the configured directory, so a model cannot invent a recipient.
-- **Registry.** Every tool call passes `ToolRegistry.invoke`: the agent must be allowed the tool, arguments must validate, a Redis fixed-window rate limit applies, the call has a timeout, and the call is logged to `tool_calls`.
+`reviewer.unsupported_figures` pulls every number with two or more digits out of the work and looks for it in the request, the subtask inputs, upstream outputs and the evidence, allowing for rounding and percentages. If any number is missing, the score is capped at 0.45 and the work is rejected, even if the model approved it.
+
+A sensitive tool is only offered when the plan lists it in the subtask's `actions` and the request itself asks for it (`tools/policy.py`). Calling it queues a `ProposedAction` rather than running it, and the tool is withdrawn for the rest of that attempt. `send_email` can only go to addresses written in the request or listed in the configured directory, so a model can't make up a recipient.
+
+Every tool call goes through `ToolRegistry.invoke`, which checks that the agent is allowed the tool, validates the arguments, applies a Redis fixed-window rate limit, enforces a timeout and logs the call to `tool_calls`.
 
 ## Models
 
@@ -99,15 +100,15 @@ Structured output works the same across providers: Anthropic and OpenAI get a fo
 | Lifetime | the run, 24 h TTL as a backstop | until it decays or the user is forgotten |
 | Holds | intermediate outputs shared by specialists | episodes, approaches, tool usage, facts, preferences, human decisions |
 
-**Writing.** When a run ends, `persist_memory` stores a `task_episode` built from the run record without a model call, then asks the memory model for up to eight lessons (`approach`, `tool_usage`, `fact`, `preference`). Each new memory is compared with the user's existing ones; above `MEMORY_DEDUPE_SIMILARITY` (0.92) the existing memory gains a little importance instead of a copy being added. Human decisions are stored as `human_decision` memories when they are made.
+When a run ends, `persist_memory` stores a `task_episode` built from the run record without a model call, then asks the memory model for up to eight lessons (`approach`, `tool_usage`, `fact`, `preference`). Each new memory is compared with the user's existing ones; above `MEMORY_DEDUPE_SIMILARITY` (0.92) the existing memory gains a little importance instead of a copy being added. Human decisions are stored as `human_decision` memories when they are made.
 
-**Reading.** `retrieve_memory` takes the top `MEMORY_TOP_K` above the embedder's minimum similarity, ranked by `similarity × (0.7 + 0.3 × effective importance)`. The planner sees them with short ids and must cite the ones it used in `memory_influence`; cited memories get an access recorded, and every retrieval is logged to `memory_retrievals` with whether it was used.
+`retrieve_memory` takes the top `MEMORY_TOP_K` above the embedder's minimum similarity, ranked by `similarity × (0.7 + 0.3 × effective importance)`. The planner sees them with short ids and must cite the ones it used in `memory_influence`; cited memories get an access recorded, and every retrieval is logged to `memory_retrievals` with whether it was used.
 
-**Scoring.** Importance is the stored base plus `0.1 × ln(1 + accesses)`, capped at 1. It decays with a half-life of `MEMORY_HALF_LIFE_DAYS` (30) since last access; preferences decay six times slower and human decisions three times slower.
+Importance is the stored base plus `0.1 × ln(1 + accesses)`, capped at 1. It decays with a half-life of `MEMORY_HALF_LIFE_DAYS` (30) since last access; preferences decay six times slower and human decisions three times slower.
 
-**Maintenance** (Celery beat, hourly): memories whose effective importance falls below `MEMORY_EXPIRE_BELOW` are deleted, and clusters above the consolidation similarity are merged into one summary memory, tagged `consolidated`, with the cluster's highest importance plus 0.1. `DELETE /users/{id}/memories` removes everything for a user.
+An hourly Celery beat job deletes memories whose effective importance falls below `MEMORY_EXPIRE_BELOW` and merges clusters above the consolidation similarity into one summary memory, tagged `consolidated`, with the cluster's highest importance plus 0.1. `DELETE /users/{id}/memories` removes everything for a user.
 
-**Embeddings.** The default `hash` embedder needs no model and matches shared vocabulary, so its thresholds are lower (minimum 0.15, consolidation 0.55). `ollama` and `openai` embedders use 0.35 and 0.85. Both can be overridden.
+The default `hash` embedder needs no model and matches shared vocabulary, so its thresholds are lower (minimum 0.15, consolidation 0.55). `ollama` and `openai` embedders use 0.35 and 0.85. Both can be overridden.
 
 ## Human in the loop
 
@@ -122,7 +123,7 @@ Structured output works the same across providers: Anthropic and OpenAI get a fo
 
 Levels and switches live in `config/escalation.yaml`; thresholds are settings.
 
-`escalate` writes an `escalations` row with the packaged context (plan, the subtask's attempts and reviews, the proposed action, past decisions on similar steps), sends notifications, then calls `interrupt()`. The run's checkpoint is the durable pause: the process can exit, and `POST /escalations/{id}/decision` enqueues a resume with `Command(resume=decision)` on whichever worker is free.
+`escalate` writes an `escalations` row with the packaged context (plan, the subtask's attempts and reviews, the proposed action, past decisions on similar steps), sends notifications, then calls `interrupt()`. The checkpoint is what makes the pause durable. The process can exit, and `POST /escalations/{id}/decision` later enqueues a resume with `Command(resume=decision)` on whichever worker is free.
 
 LangGraph re-executes the interrupted node from the top on resume, so everything before `interrupt()` is idempotent. Queue rows are keyed by `step_key#n`, where `n` counts earlier escalations of the same step, and an existing open row is reused rather than duplicated.
 
@@ -155,15 +156,15 @@ Costs come from `config/pricing.yaml`: per-model prices for hosted models, zero 
 
 ## Replay
 
-Replay re-runs a finished run as a new run of a new task with `parent_run_id` set, using the parent's recorded model answers instead of calling models.
+A replay runs a finished task again as a new task and run, with `parent_run_id` pointing at the original, and answers model calls from the original's recordings.
 
-- **Matching.** A call is identified by `call_key`, a hash of role, purpose, subtask, attempt and message count, plus its position among calls with the same key. The recorded answer is reused only if the prompt hash also matches; the first call that does not match is the divergence point, and from there calls go to real (or mock) models.
-- **Overrides.** `POST /runs/{id}/replay` accepts replacement responses keyed by `llm_calls.id`. The overridden step returns the edited answer and everything downstream runs again, so the comparison shows what that one change caused.
-- **Tools.** Recorded tool outputs, failures included, are returned for the same subtask, agent, tool and arguments. Sensitive tools are never executed in a replay.
-- **Humans and memory.** Recorded decisions answer the replay's escalations without opening queue rows. Retrieval reuses the parent's memory context, and replays write no memories.
-- **Comparison.** `GET /runs/{a}/compare/{b}` diffs the plans, each subtask's outputs and review scores, the escalations, the final output and the metrics.
+Each call is identified by its `call_key` (a hash of role, purpose, subtask, attempt and message count) and its position among calls with the same key. A recorded answer is reused only if the prompt hash matches too. The first call that doesn't match is the divergence point, and from there on calls go to the real (or mock) models.
 
-This is replay from recorded calls rather than forking a LangGraph checkpoint. Forking would replay the graph's state exactly but cannot show the effect of a changed answer early in the run, and checkpoints written before a code change may not load after it. Recorded calls survive both, at the cost of needing deterministic prompts: anything rendered into a prompt from stored JSON is sorted, because Postgres JSONB does not keep key order.
+`POST /runs/{id}/replay` takes replacement responses keyed by `llm_calls.id`. The edited step returns the new answer and everything after it runs again, so the comparison shows what that one change caused.
+
+Tool outputs, including failures, are replayed for the same subtask, agent, tool and arguments, and sensitive tools never run. Recorded human decisions answer the replay's escalations without opening queue rows. Retrieval reuses the original run's memory context, and replays don't write memories. `GET /runs/{a}/compare/{b}` diffs the plans, each subtask's outputs and review scores, the escalations, the final output and the metrics.
+
+Forking a LangGraph checkpoint would reproduce the graph state exactly, but it can't show what a changed answer early in the run would do, and checkpoints from older code may not load after a change. Recorded calls handle both cases. The cost is that prompts have to render the same way every time, so anything built from stored JSON is sorted first (Postgres JSONB doesn't keep key order).
 
 ## Data model
 
@@ -179,4 +180,4 @@ This is replay from recorded calls rather than forking a LangGraph checkpoint. F
 | `memory_retrievals` | which memories each run retrieved and used |
 | `spans` | the trace tree |
 
-Each day of the build added tables but never columns, since there is no migration tool; `init_db` creates whatever is missing.
+There's no migration tool, so schema changes only add tables, never columns. `init_db` creates whatever is missing.
